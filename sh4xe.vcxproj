@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{9E3D0E61-8F24-4F6B-9A4D-1F9DF6D0B5A1}</ProjectGuid>
+    <RootNamespace>sh4xe</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)build\$(Configuration)\</IntDir>
+    <TargetName>dsound</TargetName>
+    <TargetExt>.dll</TargetExt>
+    <DeployAfterBuild Condition="'$(DeployAfterBuild)'==''">false</DeployAfterBuild>
+    <SH4InstallDir Condition="'$(SH4InstallDir)'==''">C:\GOG Games\Silent Hill 4</SH4InstallDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)lib\MinHook\include;$(SolutionDir)lib\MinHook\src;$(SolutionDir)lib\lua;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4100;4201;4206;4244;4310;4701;4702;4706;4709;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <ModuleDefinitionFile>src\proxy\dsound.def</ModuleDefinitionFile>
+      <AdditionalOptions>/ignore:4104 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Include="src\core\dllmain.cpp" />
+    <ClCompile Include="src\core\framework.cpp" />
+    <ClCompile Include="src\hooks\d3d8_hook.cpp" />
+    <ClCompile Include="src\hooks\dinput8_hook.cpp" />
+    <ClCompile Include="src\hooks\enemy_spawn_hook.cpp" />
+    <ClCompile Include="src\hooks\file_loader_hook.cpp" />
+    <ClCompile Include="src\hooks\fov_hook.cpp" />
+    <ClCompile Include="src\hooks\fps_unlock_hook.cpp" />
+    <ClCompile Include="src\hooks\god_mode_hook.cpp" />
+    <ClCompile Include="src\hooks\hook_utils.cpp" />
+    <ClCompile Include="src\hooks\intro_skip_hook.cpp" />
+    <ClCompile Include="src\hooks\minhook_manager.cpp" />
+    <ClCompile Include="src\proxy\dsound.cpp" />
+    <ClCompile Include="src\render\console_font.cpp" />
+    <ClCompile Include="src\render\d3d8_console.cpp" />
+    <ClCompile Include="src\render\d3d8_lighting.cpp" />
+    <ClCompile Include="src\render\display_config.cpp" />
+    <ClCompile Include="src\render\render_tweaks.cpp" />
+    <ClCompile Include="src\scripting\lua_runtime.cpp" />
+    <ClCompile Include="src\sdk\binary.cpp" />
+    <ClCompile Include="src\sdk\memory.cpp" />
+    <ClCompile Include="src\sdk\memory_patch.cpp" />
+    <ClCompile Include="lib\MinHook\src\buffer.c" />
+    <ClCompile Include="lib\MinHook\src\hook.c" />
+    <ClCompile Include="lib\MinHook\src\trampoline.c" />
+    <ClCompile Include="lib\MinHook\src\hde\hde32.c" />
+    <ClCompile Include="lib\MinHook\src\hde\hde64.c" />
+    <ClCompile Include="lib\lua\lapi.c" />
+    <ClCompile Include="lib\lua\lauxlib.c" />
+    <ClCompile Include="lib\lua\lbaselib.c" />
+    <ClCompile Include="lib\lua\lcode.c" />
+    <ClCompile Include="lib\lua\lcorolib.c" />
+    <ClCompile Include="lib\lua\lctype.c" />
+    <ClCompile Include="lib\lua\ldblib.c" />
+    <ClCompile Include="lib\lua\ldebug.c" />
+    <ClCompile Include="lib\lua\ldo.c" />
+    <ClCompile Include="lib\lua\ldump.c" />
+    <ClCompile Include="lib\lua\lfunc.c" />
+    <ClCompile Include="lib\lua\lgc.c" />
+    <ClCompile Include="lib\lua\linit.c" />
+    <ClCompile Include="lib\lua\liolib.c" />
+    <ClCompile Include="lib\lua\llex.c" />
+    <ClCompile Include="lib\lua\lmathlib.c" />
+    <ClCompile Include="lib\lua\lmem.c" />
+    <ClCompile Include="lib\lua\loadlib.c" />
+    <ClCompile Include="lib\lua\lobject.c" />
+    <ClCompile Include="lib\lua\lopcodes.c" />
+    <ClCompile Include="lib\lua\loslib.c" />
+    <ClCompile Include="lib\lua\lparser.c" />
+    <ClCompile Include="lib\lua\lstate.c" />
+    <ClCompile Include="lib\lua\lstring.c" />
+    <ClCompile Include="lib\lua\lstrlib.c" />
+    <ClCompile Include="lib\lua\ltable.c" />
+    <ClCompile Include="lib\lua\ltablib.c" />
+    <ClCompile Include="lib\lua\ltm.c" />
+    <ClCompile Include="lib\lua\lundump.c" />
+    <ClCompile Include="lib\lua\lutf8lib.c" />
+    <ClCompile Include="lib\lua\lvm.c" />
+    <ClCompile Include="lib\lua\lzio.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\core\framework.h" />
+    <ClInclude Include="src\hooks\d3d8_hook.h" />
+    <ClInclude Include="src\hooks\dinput8_hook.h" />
+    <ClInclude Include="src\hooks\enemy_spawn_hook.h" />
+    <ClInclude Include="src\hooks\file_loader_hook.h" />
+    <ClInclude Include="src\hooks\fov_hook.h" />
+    <ClInclude Include="src\hooks\fps_unlock_hook.h" />
+    <ClInclude Include="src\hooks\god_mode_hook.h" />
+    <ClInclude Include="src\hooks\hook_utils.h" />
+    <ClInclude Include="src\hooks\intro_skip_hook.h" />
+    <ClInclude Include="src\hooks\minhook_manager.h" />
+    <ClInclude Include="src\render\console_font.h" />
+    <ClInclude Include="src\render\d3d8_console.h" />
+    <ClInclude Include="src\render\d3d8_lighting.h" />
+    <ClInclude Include="src\render\display_config.h" />
+    <ClInclude Include="src\render\render_tweaks.h" />
+    <ClInclude Include="src\scripting\lua_runtime.h" />
+    <ClInclude Include="src\sdk\binary.h" />
+    <ClInclude Include="src\sdk\memory.h" />
+    <ClInclude Include="src\sdk\memory_patch.h" />
+    <ClInclude Include="src\sh4\addresses.h" />
+    <ClInclude Include="src\sh4\inventory.h" />
+    <ClInclude Include="src\sh4\player.h" />
+    <None Include="scripts\deploy.ps1" />
+    <None Include="src\proxy\dsound.def" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <Target Name="DeployToSilentHill4" AfterTargets="Build" Condition="'$(DeployAfterBuild)'=='true'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;&amp; { &amp; '$(SolutionDir)scripts\deploy.ps1' -Configuration '$(Configuration)' -GameDir '$(SH4InstallDir)' }&quot;" />
+  </Target>
+</Project>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SH4 (SLUS_208.73 E3) — .debug Section Analysis</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1b2230; --ink:#d4dae3;
+    --dim:#8b97a7; --acc:#7ab7ff; --acc2:#9ad19a; --warn:#e0b15a;
+    --bad:#e08a8a; --line:#2a313c; --code:#0a0d12;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       margin:0;padding:0 0 80px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  h1{font-size:25px;margin:30px 0 4px}
+  h2{font-size:20px;margin:38px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;color:#fff}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--acc)}
+  p{margin:10px 0}
+  a{color:var(--acc);text-decoration:none}
+  code,pre{font-family:"JetBrains Mono",Consolas,"Courier New",monospace}
+  code{background:var(--code);padding:1px 5px;border-radius:4px;color:#cfe3ff;font-size:13px}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+      overflow-x:auto;font-size:12.5px;line-height:1.5;color:#cdd6e2}
+  .sub{color:var(--dim)}
+  .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;
+       padding:2px 10px;font-size:12px;color:var(--dim);margin:2px 4px 2px 0}
+  .verdict{background:linear-gradient(180deg,#16261b,#13201a);border:1px solid #2f5740;border-radius:10px;
+           padding:16px 18px;margin:18px 0}
+  .verdict b{color:var(--acc2)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 18px 14px;margin:14px 0}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#fff;font-weight:600}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr:nth-child(even) td{background:#12161d}
+  .kv{display:grid;grid-template-columns:200px 1fr;gap:2px 14px;margin:8px 0;font-size:13.5px}
+  .kv div:nth-child(odd){color:var(--dim)}
+  .big{font-size:26px;font-weight:700;color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .stat .l{color:var(--dim);font-size:12px}
+  .warn{color:var(--warn)} .bad{color:var(--bad)} .ok{color:var(--acc2)}
+  .note{border-left:3px solid var(--acc);background:#10161f;padding:10px 14px;margin:14px 0;border-radius:0 6px 6px 0}
+  .danger{border-left:3px solid var(--warn);background:#1d1810;padding:10px 14px;margin:14px 0;border-radius:0 6px 6px 0}
+  ul{margin:8px 0 8px 4px;padding-left:20px}
+  li{margin:4px 0}
+  hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+  .foot{color:var(--dim);font-size:12px;margin-top:40px;text-align:center}
+  .pill{font-size:11px;border-radius:5px;padding:1px 6px;border:1px solid var(--line)}
+  .pill.y{color:var(--acc2);border-color:#2f5740;background:#10241a}
+  .pill.n{color:var(--bad);border-color:#5a2f2f;background:#241010}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Silent Hill 4 — <code>.debug</code> Section Reverse-Engineering</h1>
+<p class="sub">Target: <code>SLUS_208.73</code> · Silent Hill 4 E3 2004 Trial (SILENT_HILL_4_VER_E3) · PS2 / MIPS R5900 · analyzed 2026-06-05</p>
+
+<div class="verdict">
+<p style="margin:2px 0"><b>Verdict.</b> The <code>.debug</code> section is <b>DWARF version 1</b> debugging information emitted by <b>Metrowerks CodeWarrior (MW MIPS C Compiler 2.4.1.01) for PlayStation 2</b>, paired with a DWARF-1 <code>.line</code> number program. It is <b>fully intact and parseable</b>. From it we can recover, mechanically and with high fidelity: <b>504 original source files</b> and their directory tree, <b>8,833 function signatures</b> with named &amp; typed parameters and locals, <b>5,061 structs / 516 unions / 721 enums</b> (52,036 typed/offset fields), <b>4,041 typed global variables at fixed addresses</b>, and <b>155,679 line→address records</b>. This is far richer than the ELF symbol table alone.</p>
+<p style="margin:8px 0 2px"><b>The EE-Reloaded angle:</b> its analyzer parses <code>.mdebug</code> (MIPS ECOFF/STABS) — a <i>different</i> on-disk format. There is no <code>.mdebug</code> here, so that parser cannot be pointed at this section. Stock Ghidra's DWARF analyzer only reads DWARF 2–5 and silently ignores v1. <b>A small DWARF-1 reader must be written</b> — but the format is simple and already prototyped in <code>tools/dwarf1/</code>.</p>
+</div>
+
+<div class="grid">
+  <div class="stat"><div class="l">.debug size</div><div class="big">6.53 MB</div><div class="sub">135,517 DIEs</div></div>
+  <div class="stat"><div class="l">functions w/ signature</div><div class="big">8,833</div><div class="sub">all with PC range</div></div>
+  <div class="stat"><div class="l">aggregate types</div><div class="big">6,298</div><div class="sub">struct+union+enum</div></div>
+  <div class="stat"><div class="l">source files</div><div class="big">504</div><div class="sub">full paths + tree</div></div>
+  <div class="stat"><div class="l">line records</div><div class="big">155,679</div><div class="sub">.line · 1.55 MB</div></div>
+  <div class="stat"><div class="l">typed globals</div><div class="big">4,041</div><div class="sub">at fixed addrs</div></div>
+</div>
+
+<h2>1 · Binary identification</h2>
+<div class="kv">
+  <div>File / size</div><div><code>SLUS_208.73</code> — 12,747,716 bytes</div>
+  <div>Container</div><div>ELF32, little-endian, <code>e_machine = 8</code> (MIPS), entry <code>0x00100008</code>, image base <code>0x00100000</code></div>
+  <div>CPU</div><div>Emotion Engine R5900 (Ghidra language <code>r5900:LE:32:default</code>)</div>
+  <div>Compiler (.comment)</div><div><code>MW MIPS C Compiler (2.4.1.01)</code> · <code>PlayStation2</code></div>
+  <div>Marker section</div><div><code>.mwcats</code> (8 bytes) — Metrowerks CodeWarrior tooling fingerprint</div>
+  <div>Assembler (crt0)</div><div><code>Metrowerks MW GAS R5900 Assembler</code></div>
+  <div>Build identity</div><div>E3 2004 trial build; source on dev drives <code>F:\E3\sh4</code>, <code>F:\E3\sglib</code>; SDK <code>V:\sce281</code> (SCE 2.8.1); toolchain <code>C:\Metrowerks\CodeWarrior\PS2 Support</code></div>
+</div>
+
+<div class="danger">
+<b>Provenance caveat (read this before planning a PC mod).</b> This is the <b>E3 trial on PS2</b>, not retail PS2 and not the PC (GOG) port. The <i>names, struct layouts, enum constants and source-file organisation</i> are effectively the same codebase as retail/PC and transfer extremely well. The <i>addresses</i> (function PCs, global addresses, line maps) are valid <b>only for this PS2 image</b>. For the PC binary, treat this build as an annotated <b>Rosetta stone</b>: port types as a library and port names by function matching (see §8).</p>
+</div>
+
+<h2>2 · Section layout</h2>
+<table>
+<tr><th>Section</th><th>Type</th><th class="n">Size</th><th>Role</th></tr>
+<tr><td><code>main</code></td><td>PROGBITS</td><td class="n">2,929,280</td><td>code+data, vaddr 0x00100000–0x003cb27f</td></tr>
+<tr><td><code>.debug</code></td><td class="warn">0x7000005</td><td class="n">6,529,341</td><td><b>DWARF v1 DIE stream</b> — types, funcs, vars, scopes</td></tr>
+<tr><td><code>.line</code></td><td class="warn">0x7000005</td><td class="n">1,627,438</td><td><b>DWARF v1 line program</b> — line→PC per unit</td></tr>
+<tr><td><code>.symtab</code> / <code>.strtab</code></td><td>SYMTAB</td><td class="n">363,536 / 371,603</td><td>ELF symbols (22,721) — independent cross-check</td></tr>
+<tr><td><code>.mwcats</code></td><td class="warn">vendor</td><td class="n">8</td><td>Metrowerks marker</td></tr>
+<tr><td><code>.reginfo</code></td><td>MIPS_REGINFO</td><td class="n">24</td><td>GP register usage</td></tr>
+<tr><td><code>.relmain</code></td><td>REL</td><td class="n">785,560</td><td>relocations for <code>main</code></td></tr>
+<tr><td><code>.relo_3ldk.bin … .relo_water.bin</code></td><td>REL</td><td class="n">~9 sets</td><td>per-room <b>overlay</b> relocations (3ldk, forest, home, hospit, subway, water, past, last, build) loaded at <code>0x01ed3f00</code></td></tr>
+</table>
+<p class="sub">The tell-tale that this is DWARF <b>1</b> (not 2+): a single monolithic <code>.debug</code> plus a separate <code>.line</code> — rather than the DWARF-2 split of <code>.debug_info</code>/<code>.debug_abbrev</code>/<code>.debug_line</code>/<code>.debug_str</code>. CodeWarrior was the canonical DWARF-1 producer.</p>
+
+<h2>3 · How CodeWarrior encodes DWARF 1 here (the reversed format)</h2>
+<p>Everything below was confirmed by reading raw bytes (<code>tools/dwarf1/probe*.py</code>). Little-endian throughout.</p>
+
+<h3>3.1 · DIE stream (<code>.debug</code>)</h3>
+<p>The section is a flat stream of <b>Debugging Information Entries</b>. There is no abbreviation table (that is a DWARF-2 concept); every DIE is self-describing:</p>
+<pre>DIE        := u32 length      ; total bytes of THIS die, including the length word
+              u16 tag         ; TAG_* (compile_unit, structure_type, global_subroutine, ...)
+              attribute*      ; until 'length' is consumed
+attribute  := u16 (attr | form)   ; low nibble = FORM_*, high 12 bits = AT_*
+              value           ; size determined by FORM
+; Children are stored INLINE after a DIE; you find the next *sibling* via AT_sibling.
+; A "null entry" (length &lt; 6, usually the 4-byte word) terminates a sibling chain.</pre>
+<p><b>Forms</b> (low nibble of the attribute word) — this is what makes a v1 reader easy; you can skip any unknown attribute:</p>
+<table>
+<tr><th>Form</th><th>Value</th><th>Encoding</th></tr>
+<tr><td>FORM_ADDR</td><td><code>0x1</code></td><td>4-byte target address</td></tr>
+<tr><td>FORM_REF</td><td><code>0x2</code></td><td>4-byte offset of another DIE within <code>.debug</code></td></tr>
+<tr><td>FORM_BLOCK2 / BLOCK4</td><td><code>0x3 / 0x4</code></td><td>u16/u32 length prefix, then raw bytes</td></tr>
+<tr><td>FORM_DATA2 / DATA4 / DATA8</td><td><code>0x5 / 0x6 / 0x7</code></td><td>2 / 4 / 8 byte constant</td></tr>
+<tr><td>FORM_STRING</td><td><code>0x8</code></td><td>inline NUL-terminated string</td></tr>
+</table>
+
+<h3>3.2 · Compile unit</h3>
+<p>One <code>TAG_compile_unit</code> per function/section (≈ one per function — that is why CU count ≈ function count). It carries <code>AT_name</code> = the full source path, <code>AT_producer</code>, <code>AT_language</code> (<code>0x2</code> = C), and <code>AT_low_pc</code>/<code>AT_high_pc</code>/<code>AT_stmt_list</code> (offset into <code>.line</code>). The very first CU decodes as:</p>
+<pre>off 0x000  len 0x62  TAG_compile_unit
+  AT_sibling   = 0x0000cc
+  AT_low_pc    = 0x00100000
+  AT_high_pc   = 0x00100228
+  AT_stmt_list = 0x00000000        -&gt; .line offset for this unit's line program
+  AT_language  = 0x00008000        -&gt; vendor (this CU is crt0.s / assembly)
+  AT_producer  = "Metrowerks MW GAS R5900 Assembler"
+  AT_name      = "V:\sce281\ee\lib\crt0.s"</pre>
+
+<h3>3.3 · Type references &amp; the pointer/const trick</h3>
+<p>CodeWarrior does <b>not</b> emit <code>pointer_type</code> or <code>typedef</code> DIEs (both counts are 0). Instead a member/parameter/variable names its type via one of:</p>
+<table>
+<tr><th>Attribute</th><th>Form</th><th>Meaning</th></tr>
+<tr><td><code>AT_fund_type</code></td><td>DATA2</td><td>a fundamental type code (FT_int=0x8, FT_float=0xe, FT_void=0x14, …)</td></tr>
+<tr><td><code>AT_user_def_type</code></td><td>REF</td><td>offset of a struct/union/enum/array/func DIE</td></tr>
+<tr><td><code>AT_mod_fund_type</code></td><td>BLOCK2</td><td><code>[modifier bytes…][u16 fund_type]</code></td></tr>
+<tr><td><code>AT_mod_u_d_type</code></td><td>BLOCK2</td><td><code>[modifier bytes…][u32 DIE-ref]</code></td></tr>
+</table>
+<p>Modifier bytes (applied left→right): <code>0x01</code> = pointer-to, <code>0x02</code> = reference-to, <code>0x03</code> = const, <code>0x04</code> = volatile. So <code>sfCldObject.stay_node</code> stores <code>AT_mod_u_d_type = 01 6a0d0000</code> → "pointer to the DIE at 0x0d6a" (which resolves to <code>struct sgQTNode</code>).</p>
+
+<h3>3.4 · Member offsets, globals, and locals (location atoms)</h3>
+<p><code>AT_location</code> is a tiny stack program of atoms; we only ever see three shapes:</p>
+<pre>struct member  : 04 &lt;u32 offset&gt; 07      ; OP_CONST offset, OP_ADD   -&gt; field byte offset
+global var     : 03 &lt;u32 address&gt;        ; OP_ADDR addr            -&gt; absolute load address
+register param : 01 &lt;u32 regno&gt;          ; OP_REG  reg             -&gt; arg in a register
+frame local    : 02 &lt;u32 reg&gt; … 04 &lt;off&gt; 07 ; OP_BASEREG + OP_CONST  -&gt; stack slot</pre>
+<p>Worked example — <code>struct sfCldObject</code> members decode to offsets <code>+0x00, +0x30, +0x34, +0x4c, +0x4d, +0x50</code>, matching <code>AT_byte_size = 0x60</code>.</p>
+
+<h3>3.5 · Enumerations</h3>
+<p><code>TAG_enumeration_type</code> holds <code>AT_byte_size</code> and <code>AT_element_list</code> (BLOCK4) = repeated <code>{ value, "name\0" }</code>; the value width follows <code>AT_byte_size</code>. e.g. <code>enum sgIKSolveResult { SG_IK_RESULT_NONE=0, SG_IK_RESULT_OK=1, … }</code>.</p>
+
+<h3>3.6 · Line program (<code>.line</code>)</h3>
+<pre>per unit:  u32 total_length            ; bytes incl. this header
+           u32 base_pc                 ; address the offsets are relative to
+           entry* {
+              u32 line                 ; source line number
+              u16 column               ; 0xffff = "whole line / none"
+              u32 pc_offset            ; add to base_pc
+           }</pre>
+<p>8,831 line programs, 155,679 entries, covering PCs <code>0x00100000 … 0x01ee56bc</code> (the entire <code>main</code> image and the room overlays).</p>
+
+<h2>4 · Recovery inventory</h2>
+<table>
+<tr><th>DIE kind</th><th class="n">Count</th><th>What it yields</th></tr>
+<tr><td>compile_unit</td><td class="n">9,373</td><td>source path per function; language; CU PC range</td></tr>
+<tr><td>global_subroutine / subroutine</td><td class="n">4,883 / 3,950</td><td><b>8,833</b> named functions, all with low/high PC</td></tr>
+<tr><td>formal_parameter</td><td class="n">13,608</td><td>named, typed parameters (avg 1.5/func)</td></tr>
+<tr><td>local_variable</td><td class="n">20,280</td><td>named locals + stack/register locations</td></tr>
+<tr><td>lexical_block</td><td class="n">8,830</td><td>scope nesting for locals</td></tr>
+<tr><td>structure_type</td><td class="n">5,061</td><td>tagged structs</td></tr>
+<tr><td>member</td><td class="n">52,036</td><td>field name + offset + type</td></tr>
+<tr><td>union_type</td><td class="n">516</td><td>tagged unions</td></tr>
+<tr><td>enumeration_type</td><td class="n">721</td><td>enum names + constant lists</td></tr>
+<tr><td>array_type</td><td class="n">9,782</td><td>element type + bounds</td></tr>
+<tr><td>subroutine_type</td><td class="n">2,427</td><td>function-pointer signatures</td></tr>
+<tr><td>global_variable</td><td class="n">4,041</td><td>typed global at fixed address</td></tr>
+</table>
+<p class="sub">Cross-check: the independent ELF <code>.symtab</code> carries 22,721 symbols — useful to validate names and to catch functions the DWARF may have inlined or omitted.</p>
+
+<h2>5 · Recovered source tree</h2>
+<p>504 distinct <code>.c</code> files; every one of the 8,833 functions is attributed to its file, so the whole module tree reconstructs:</p>
+<table>
+<tr><th>Root</th><th class="n">funcs</th><th>Meaning</th></tr>
+<tr><td><code>F:\E3\sh4</code></td><td class="n">8,016</td><td>the game itself (engine glue + gameplay)</td></tr>
+<tr><td><code>F:\E3\sglib</code></td><td class="n">813</td><td>Konami "sg" engine library (geometry, animation, IK…)</td></tr>
+<tr><td><code>V:\sce281\ee</code> / Metrowerks</td><td class="n">4</td><td>SDK crt0 + compiler wrapper</td></tr>
+</table>
+<p>Top subsystems under <code>sh4/</code> (functions):</p>
+<pre>game/enemy            932    sys/apps            367    sys/geometry        202
+game/misc            693    game/eileen         331    sys/sound           198
+game/gamemain        603    game/event          291    game/gamemain/camera 169
+game/event/3ldk0     417    player/battle       228    sys/storage         167
+                                 game/room       208    game/player         164
+enemy/ghost 147 · enemy/killer 137 · event/subway0 132 · event/pasthome0 122 · enemy/hyena 121
+effect/particle 111 · sys/raster 104 · game/message 90 · geometry/collision 86 · game/objs 84</pre>
+<p>Heaviest files: <code>game/enemy/en_common.c</code> (189), <code>en_collision.c</code> (146), <code>misc/misc_map.c</code> (115), <code>event/3ldk0/ev_3ldk0_etc.c</code> (108), <code>enemy/hyena/en_hyena.c</code> (104), <code>gamemain/game_demo.c</code> (101), <code>sys/apps/sf_pad2.c</code> (101), <code>eileen/eileen.c</code> (93).</p>
+
+<h2>6 · Proof — decoded straight from <code>.debug</code></h2>
+<p>Produced by <code>tools/dwarf1/samples.py</code> (resolving refs, modifier blocks, member offsets). <span class="sub">(<code>array</code>/<code>&lt;func&gt;</code> placeholders = array-subscript and function-pointer base types not yet prettified — trivial finish-work.)</span></p>
+<pre>struct sfCharacter {                 // sizeof 0xf0
+    /* +0x000 */ struct sgBone   root;
+    /* +0x070 */ struct sgAnime  anime_work;
+    /* +0x0b4 */ struct @anon2   model_work;
+    /* +0x0d4 */ struct sgSVModel sv_model;
+    /* +0x0e0 */ struct sgAnime *anime;
+    /* +0x0e4 */ unsigned short  flag;
+};
+
+struct ktLight {                     // sizeof 0x60
+    /* +0x000 */ struct ktLight *next;     /* +0x004 */ struct ktLight *link;
+    /* +0x008 */ float r,g,b;              /* +0x014 */ unsigned int type;
+    /* +0x020 */ struct @anon9 pos;        /* +0x030 */ struct @anon9 vec;
+    /* +0x040 */ float f_start, f_end, cone, spread, f_a, f_b, s_a, s_b;
+};
+
+// function signatures, fully typed:
+void   sfCharacterConstruct(struct sfCharacter *chara, void *model, void *texture);  // 0x139230
+void   sfCharacterAnimeConstruct(struct sfCharacter *chara, struct sgAnime *anime);  // 0x1392b0
+void   sfCharacterDestruct(struct sfCharacter *chara);                               // 0x139430
+float *sfCharacterRot(struct sfCharacter *chara);                                    // 0x139520
+
+enum sgIKSolveResult { SG_IK_RESULT_NONE=0, SG_IK_RESULT_OK=1, /* … */ };</pre>
+
+<h2>7 · Applying it to Ghidra — and the EE-Reloaded question</h2>
+
+<h3>7.1 · Why the EE-Reloaded STABS/<code>.mdebug</code> analyzer can't be pointed at this</h3>
+<p>EE Reloaded's symbolic analyzer targets <code>.mdebug</code> — the MIPS/SGI <b>ECOFF symbolic header (HDRR)</b>: fixed-size record arrays (file descriptors <code>FDR</code>, procedure descriptors <code>PDR</code>, local/external symbols <code>SYMR</code>/<code>EXTR</code>, auxiliary type words <code>AUXU</code>, dense numbers, line tables), sometimes with GCC <b>STABS</b> strings embedded. That is a completely different byte format and data model from DWARF-1's length/tag/attribute DIE stream. <b>This binary has no <code>.mdebug</code> section at all</b>, so the analyzer simply has nothing to chew on — it cannot be "recycled" at the parsing level.</p>
+<table>
+<tr><th></th><th>EE-Reloaded mdebug analyzer</th><th>What SH4 needs</th></tr>
+<tr><td>Section</td><td><code>.mdebug</code> (HDRR)</td><td><code>.debug</code> + <code>.line</code> (DWARF 1)</td></tr>
+<tr><td>Model</td><td>ECOFF records / STABS strings</td><td>DIE tree, form-typed attributes</td></tr>
+<tr><td>Reusable parser?</td><td colspan="2" class="bad">No — incompatible formats</td></tr>
+<tr><td>Reusable scaffolding?</td><td colspan="2" class="ok">Yes — the Ghidra-side application layer (below)</td></tr>
+</table>
+<p>What <i>is</i> worth recycling from it is the <b>integration scaffolding</b>, which is format-agnostic and already battle-tested for EE programs:</p>
+<ul>
+<li>How it registers an <code>Analyzer</code> that triggers on an EE/PS2 ELF and reads <b>non-loaded overlay blocks</b>.</li>
+<li>How it builds Ghidra <code>DataType</code>s (structs/unions/enums/arrays/function-defs) into managed <b>categories</b> and resolves cyclic refs.</li>
+<li>How it attaches <b>function signatures</b>, <b>stack/register variable storage</b>, and <b>source-line comments</b>.</li>
+<li>Its handling of EE relocations and the per-room overlay address space.</li>
+</ul>
+<div class="note">Also note: Ghidra's <b>built-in</b> DWARF analyzer supports DWARF <b>2–5 only</b>; it does not implement a v1 reader and will ignore this <code>.debug</code>. So neither EE-Reloaded nor stock Ghidra handles it out of the box — a purpose-built DWARF-1 reader is required either way. The good news is DWARF-1 is small and self-describing; the parser already exists in <code>tools/dwarf1/</code>.</div>
+
+<h3>7.2 · Recommended implementation</h3>
+<p>Three viable shapes; <b>Option A</b> is recommended, written so its parser core can later be lifted into Option B.</p>
+<table>
+<tr><th>Option</th><th>Shape</th><th>Pros</th><th>Cons</th></tr>
+<tr><td><b>A · Parser → JSON → applier</b> <span class="pill y">recommended</span></td>
+    <td>Pure-Python DWARF-1 reader (90% done here) emits a normalized JSON model; a thin in-process Ghidra/Jython script (run via <code>run_ghidra_script</code>) applies types+sigs+globals+line comments in one batch. Also emit a <code>.gdt</code> type archive.</td>
+    <td>Iterate the hard part in Python; deterministic; reviewable JSON; one fast apply pass (no thousands of MCP round-trips); <b>.gdt reusable on the PC binary</b>.</td>
+    <td>Two pieces to wire; Jython apply script to write.</td></tr>
+<tr><td>B · Native analyzer extension</td>
+    <td>Java <code>AbstractAnalyzer</code> packaged as its own Ghidra extension, structurally modeled on EE-Reloaded's mdebug analyzer; could be contributed back as a sibling "DWARF1" analyzer.</td>
+    <td>One-click in the GUI; redistributable; native overlay/reloc handling.</td>
+    <td>Java; slower to iterate; must learn EE-Reloaded internals; overkill for a one-off.</td></tr>
+<tr><td>C · Type-archive only</td>
+    <td>Python emits a <code>.gdt</code> + a names/signatures script; import into both the PS2 and PC databases.</td>
+    <td>Maximally portable types; smallest surface.</td>
+    <td>Leaves function/var application to a second step.</td></tr>
+</table>
+
+<h3>7.3 · The apply transform (what the importer does)</h3>
+<ul>
+<li><b>Types, two passes.</b> Pass 1: create empty named shells for every struct/union/enum/array/func DIE (keyed by DIE offset) to satisfy forward and cyclic references. Pass 2: fill members — offset from the location atom, type resolved through fund/user/mod-blocks, pointers via <code>PointerDataType</code>, fundamentals → Ghidra builtins.</li>
+<li><b>Functions.</b> rename → set prototype/signature; map parameters to register storage (<code>OP_REG</code>) and locals to stack storage (<code>OP_BASEREG</code>+offset); stamp the source file as a namespace or plate comment.</li>
+<li><b>Globals.</b> apply the recovered data type at the <code>OP_ADDR</code> address.</li>
+<li><b>Line info.</b> from <code>.line</code>, set <code>file.c:NN</code> comments (or a source map) per address; enables grouping the listing by original file.</li>
+<li><b>Validation.</b> reconcile names against the 22,721-entry <code>.symtab</code>; assert recovered <code>AT_byte_size</code> equals the summed/aligned field layout.</li>
+</ul>
+
+<h2>8 · Porting to the PC (GOG) version</h2>
+<p>The PC port is the same Konami codebase recompiled for x86/Windows, so the recovered <i>knowledge</i> transfers; the <i>addresses</i> do not. Plan:</p>
+<ul>
+<li><b>Types →</b> ship the recovered structs/enums as a <code>.gdt</code> and import directly into the PC database. Layout/field names are essentially identical (watch for pointer width 4→4 — same; and any <code>#pragma pack</code> differences — unlikely within the engine).</li>
+<li><b>Names/signatures →</b> port by <b>function matching</b>: generate signatures from the (now fully-named) PS2 reference and match against the PC binary (Ghidra Function ID / BSim, IDA FLIRT/Lumina-style, or BinDiff). The 504-file source map makes triage tractable — match subsystem by subsystem.</li>
+<li><b>Rosetta value →</b> even unmatched functions become readable because you know the参与 types and the source module they belong to; reversing the PC build stops being "squint at <code>FUN_00xxxxxx</code>" and becomes "fill in <code>en_hyena.c</code>".</li>
+</ul>
+
+<h2>9 · Artifacts in this repo</h2>
+<table>
+<tr><th>Path</th><th>What it is</th></tr>
+<tr><td><code>tools/dwarf1/probe.py</code></td><td>ELF section table + raw section heads (format confirmation)</td></tr>
+<tr><td><code>tools/dwarf1/analyze.py</code></td><td>full DWARF-1 walk → <code>summary.json</code> + the §4 inventory</td></tr>
+<tr><td><code>tools/dwarf1/probe2.py / probe3.py</code></td><td>byte-level proof of member/modifier/location/global encodings</td></tr>
+<tr><td><code>tools/dwarf1/srctree.py</code></td><td>source-tree aggregation → <code>srctree.json</code> (§5)</td></tr>
+<tr><td><code>tools/dwarf1/samples.py</code></td><td>resolver prototype → decoded C in <code>samples.json</code> (§6)</td></tr>
+</table>
+
+<p class="foot">SLUS_208.73 (SH4 E3 2004 trial) · DWARF v1 / Metrowerks CodeWarrior PS2 · analysis generated 2026-06-05</p>
+
+</div>
+</body>
+</html>

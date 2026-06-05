@@ -1,0 +1,6 @@
+[submodule "lib/MinHook"]
+	path = lib/MinHook
+	url = https://github.com/TsudaKageyu/minhook.git
+[submodule "lib/lua"]
+	path = lib/lua
+	url = https://github.com/lua/lua.git

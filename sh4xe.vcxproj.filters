@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{27662A02-7E25-405E-8CED-9FD6BC1F7B01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core">
+      <UniqueIdentifier>{7008E6D4-2FE6-418F-9BB7-D8BF9F74E08E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\proxy">
+      <UniqueIdentifier>{4C2115CE-0D33-467D-A41E-E2B3976D427C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\hooks">
+      <UniqueIdentifier>{AEFC5847-7520-4D72-B7A6-55AE9B4AB212}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\render">
+      <UniqueIdentifier>{3E9F2294-BBCB-4DFC-A32D-C28F82D6F331}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\scripting">
+      <UniqueIdentifier>{3C347C92-464F-4F25-93C8-0F6F18BB525C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\sdk">
+      <UniqueIdentifier>{0E887772-D558-47C2-8F1D-3095862F56D6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\sh4">
+      <UniqueIdentifier>{30EC4386-B3F4-4769-B5B1-2A8B0BDE4A1A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib\MinHook">
+      <UniqueIdentifier>{A770931C-A5EC-422D-806B-C52D54921A06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib\lua">
+      <UniqueIdentifier>{93C7C32F-8800-4917-B0AA-78F2860AB4B7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\core\dllmain.cpp"><Filter>src\core</Filter></ClCompile>
+    <ClCompile Include="src\core\framework.cpp"><Filter>src\core</Filter></ClCompile>
+    <ClCompile Include="src\hooks\d3d8_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\dinput8_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\enemy_spawn_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\file_loader_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\fov_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\fps_unlock_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\god_mode_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\hook_utils.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\intro_skip_hook.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\minhook_manager.cpp"><Filter>src\hooks</Filter></ClCompile>
+    <ClCompile Include="src\proxy\dsound.cpp"><Filter>src\proxy</Filter></ClCompile>
+    <ClCompile Include="src\render\console_font.cpp"><Filter>src\render</Filter></ClCompile>
+    <ClCompile Include="src\render\d3d8_console.cpp"><Filter>src\render</Filter></ClCompile>
+    <ClCompile Include="src\render\d3d8_lighting.cpp"><Filter>src\render</Filter></ClCompile>
+    <ClCompile Include="src\render\display_config.cpp"><Filter>src\render</Filter></ClCompile>
+    <ClCompile Include="src\render\render_tweaks.cpp"><Filter>src\render</Filter></ClCompile>
+    <ClCompile Include="src\scripting\lua_runtime.cpp"><Filter>src\scripting</Filter></ClCompile>
+    <ClCompile Include="src\sdk\binary.cpp"><Filter>src\sdk</Filter></ClCompile>
+    <ClCompile Include="src\sdk\memory.cpp"><Filter>src\sdk</Filter></ClCompile>
+    <ClCompile Include="src\sdk\memory_patch.cpp"><Filter>src\sdk</Filter></ClCompile>
+    <ClCompile Include="lib\MinHook\src\buffer.c"><Filter>lib\MinHook</Filter></ClCompile>
+    <ClCompile Include="lib\MinHook\src\hook.c"><Filter>lib\MinHook</Filter></ClCompile>
+    <ClCompile Include="lib\MinHook\src\trampoline.c"><Filter>lib\MinHook</Filter></ClCompile>
+    <ClCompile Include="lib\MinHook\src\hde\hde32.c"><Filter>lib\MinHook</Filter></ClCompile>
+    <ClCompile Include="lib\MinHook\src\hde\hde64.c"><Filter>lib\MinHook</Filter></ClCompile>
+    <ClCompile Include="lib\lua\*.c"><Filter>lib\lua</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\core\framework.h"><Filter>src\core</Filter></ClInclude>
+    <ClInclude Include="src\hooks\d3d8_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\dinput8_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\enemy_spawn_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\file_loader_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\fov_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\fps_unlock_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\god_mode_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\hook_utils.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\intro_skip_hook.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\minhook_manager.h"><Filter>src\hooks</Filter></ClInclude>
+    <ClInclude Include="src\render\console_font.h"><Filter>src\render</Filter></ClInclude>
+    <ClInclude Include="src\render\d3d8_console.h"><Filter>src\render</Filter></ClInclude>
+    <ClInclude Include="src\render\d3d8_lighting.h"><Filter>src\render</Filter></ClInclude>
+    <ClInclude Include="src\render\display_config.h"><Filter>src\render</Filter></ClInclude>
+    <ClInclude Include="src\render\render_tweaks.h"><Filter>src\render</Filter></ClInclude>
+    <ClInclude Include="src\scripting\lua_runtime.h"><Filter>src\scripting</Filter></ClInclude>
+    <ClInclude Include="src\sdk\binary.h"><Filter>src\sdk</Filter></ClInclude>
+    <ClInclude Include="src\sdk\memory.h"><Filter>src\sdk</Filter></ClInclude>
+    <ClInclude Include="src\sdk\memory_patch.h"><Filter>src\sdk</Filter></ClInclude>
+    <ClInclude Include="src\sh4\addresses.h"><Filter>src\sh4</Filter></ClInclude>
+    <ClInclude Include="src\sh4\inventory.h"><Filter>src\sh4</Filter></ClInclude>
+    <ClInclude Include="src\sh4\player.h"><Filter>src\sh4</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="scripts\deploy.ps1" />
+    <None Include="src\proxy\dsound.def"><Filter>src\proxy</Filter></None>
+  </ItemGroup>
+</Project>
