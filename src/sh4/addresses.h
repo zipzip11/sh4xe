@@ -86,6 +86,27 @@ inline constexpr uintptr_t kCamBobIncrementConst30 = 0x005B7E80; // shared 1/30,
 inline constexpr uintptr_t kCamBobIncrementConst15 = 0x005B7E88; // shared 1/15, expected operand
 inline constexpr unsigned int kCamBobIncrementDispOffset = 2;    // operand offset within the fmul
 
+// The VERTICAL head bob proper -- the PS2 `cam3GetShakeHeight` (game_camera_3ldk.c),
+// ported to sub_4FFC40 and fed into sub_5009D0 (cam3DecidePosition) -> cam height.
+// This is a SEPARATE phase from the horizontal sway above: it owns its own phase
+// accumulator flt_1083544 (used nowhere else) and advances it once per simulation
+// step with NO Game_GetFrameSeconds term:
+//     flt_1083544 += clamp(|moved_speed|/250) * (PI/15);   // fmul dword ptr [flt_5BF7A4]
+// sin(flt_1083544) becomes the up/down camera offset, and a footstep SFX
+// (sub_56C9B0(0x9C51, ...)) fires on each +/-PI wrap. moved_speed is a genuine
+// velocity -- Camera_SyncPlayerCameraState computes it as (deltaPos / GetFrameSeconds),
+// so it is fps-INDEPENDENT; with PI/15 inlined, the whole bob (and footsteps) runs at
+// 2x at 60 steps/sec. This is the "walking on your toes" bob the user reported, and it
+// is NOT one of the camera+0x84 sway sites above, so the existing redirect never
+// reached it. We repoint just this fmul operand at a DLL float held at the matching
+// per-frame step (PI/15)*30/fps (== PI/15 at the stock 30, so inert when off).
+//
+// The PI/15 constant flt_5BF7A4 is SHARED: Camera_UpdateFollow (@0x504197) reuses it
+// as a camera catch-up ANGLE floor (radians), already slewed by Game_GetFrameSeconds,
+// so it must be left alone -- hence operand redirect here, never a constant rewrite.
+inline constexpr uintptr_t kCamBobShakeIncrementSite = 0x004FFCDB;  // sub_4FFC40 vertical head bob
+inline constexpr uintptr_t kCamBobShakeIncrementConst = 0x005BF7A4; // shared PI/15, expected operand
+
 // Startup intro sequence:
 // - Startup_RunOpeningSplash loads snap_opening.bin and fades the static
 //   logo/legal splash screens.

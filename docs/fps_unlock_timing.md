@@ -106,10 +106,15 @@ for the window before the D3D device — and therefore the `EndScene` tick — e
 
 ## Procedural camera head-bob / walk-sway (fixed-step — corrected)
 
-The first-/walk-camera **head bob** does not route through `Game_GetFrameSeconds`,
-so the per-frame re-assertion above cannot reach it. The active camera object holds
-a bob **phase angle** at `camera+0x84`; the camera-mode position updaters advance it
-once per simulation step by a *fixed* increment with the stock frame time inlined:
+There are **two distinct** fixed-step procedural-camera systems, each with its own
+phase accumulator. Neither routes through `Game_GetFrameSeconds`, so the per-frame
+re-assertion above cannot reach them; both advance once per simulation step by a
+*fixed* increment with the stock frame time (or `π/15`) inlined, and so both run at
+**2× at 60 steps/sec** unless corrected.
+
+**1. Horizontal walk-sway** — the active camera object holds a sway **phase angle**
+at `camera+0x84`; the camera-mode position updaters advance it and feed
+`sin()/cos()` into the camera *x/z* offset:
 
 ```c
 // sub_534590 (mode 0) @ 0x5345A9, sub_534620 (mode 2) @ 0x534647 : STEP = 1/30
@@ -117,26 +122,45 @@ once per simulation step by a *fixed* increment with the stock frame time inline
 *(float*)(camera + 0x84) += move_speed * STEP;   // fmul dword ptr [const]
 ```
 
-`sin()/cos()` of that phase then bob/sway the camera and a footstep SFX fires on
-each π wrap, so at 60 steps/sec the bob **and its footsteps run at 2×**. (Confirmed
-against the PS2 E3 prototype symbols, where the same logic is `cam3GetShakeHeight`
-feeding `cam3DecidePosition`, gated by the "Head Motion" option.)
+**2. Vertical head-bob (the one you *feel*)** — the PS2 `cam3GetShakeHeight`
+(`game_camera_3ldk.c`), ported to `sub_4FFC40` and consumed by `sub_5009D0`
+(`cam3DecidePosition`) as the camera height. It owns a **separate** phase
+accumulator `flt_1083544` (used nowhere else) and a separate constant `π/15`:
 
-The 1/30 (`flt_5B7E80`) and 1/15 (`flt_5B7E88`) constants are **shared**, so they
-cannot simply be rescaled — see the audit below. Instead the unlock repoints just
-these three `fmul` operands at two DLL-owned floats
-(`g_bobIncrementStep30/15` in `fps_unlock_hook.cpp`) held at the matching per-frame
-step, updated every frame from the same `fps`:
+```c
+// sub_4FFC40 @ 0x4FFCDB : STEP = π/15 (flt_5BF7A4)
+flt_1083544 += clamp(|moved_speed| / 250) * (π/15);   // fmul dword ptr [flt_5BF7A4]
+return sinf(flt_1083544);                              // → vertical cam height
+```
+
+`moved_speed` is a genuine **velocity** — `Camera_SyncPlayerCameraState` computes it
+as `(deltaPos / Game_GetFrameSeconds)`, which is fps-independent — so with `π/15`
+inlined the vertical bob (and its footstep SFX `sub_56C9B0(0x9C51,…)` on each π wrap)
+runs at exactly 2× at 60. This is the **"walking on your toes"** symptom. It is
+gated by the "Head Motion" option (full / half / off). It was previously missed
+because it is *not* one of the `camera+0x84` sway sites and uses a different phase
+and constant.
+
+The `1/30` (`flt_5B7E80`), `1/15` (`flt_5B7E88`) and `π/15` (`flt_5BF7A4`) constants
+are all **shared** with real-time-period uses elsewhere (e.g. `flt_5BF7A4` is reused
+in `Camera_UpdateFollow @0x504197` as a camera catch-up *angle* floor, already slewed
+by `Game_GetFrameSeconds`), so they cannot be rescaled in place — see the audit
+below. Instead the unlock repoints just these `fmul` operands at DLL-owned floats
+(`g_bobIncrementStep30/15`, `g_bobShakeIncrement` in `fps_unlock_hook.cpp`) held at
+the matching per-frame step, updated every frame from the same `fps`:
 
 | Site STEP | Held value at `fps` | At stock 30 |
 | --- | --- | --- |
 | 1/30 | `1/fps` | `1/30` (no-op) |
 | 1/15 | `2/fps` | `1/15` (no-op) |
+| π/15 | `(π/15)·30/fps` | `π/15` (no-op) |
 
 Because the held value equals the original constant at 30, the redirect is inert
 when the unlock is off (`fps 30` / `fps off`). The operands are rewritten once, from
 the game thread (EndScene), after verifying they still match the expected constant
-address (so a different build is skipped rather than corrupted).
+address (so a different build is skipped rather than corrupted). The startup log
+line reports the result, e.g.
+`camera fps fix: … (sway 1/30=1,1 sway 1/15=1 look 1/15=1 bob π/15=1)`.
 
 ## Audit: baked frame-time constants — period vs. increment
 

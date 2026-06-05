@@ -118,3 +118,34 @@ tools:
 Keep generated SDK outputs out of the runtime until a hook needs them. When a
 hook graduates from SDK data into active code, copy only the validated address or
 type slice into the appropriate `src/sh4/` header and cite the correlation note.
+
+## Status: implemented (2026-06)
+
+The milestone above is in place under `tools/sdk/` (see its `README.md`):
+
+- `export_ps2_model.py` -> `generate_headers.py` -> `correlate_pc.py` is the
+  offline model/header/worklist pipeline.
+- **Automatic correlation** is now real and split into a network half and an
+  offline half so the matcher stays deterministic and testable:
+  - `mcp_client.py` -- dependency-free MCP-streamable-HTTP client.
+  - `export_anchors.py` -- pulls per-function *anchors* (strings + distinctive
+    numeric constants) from IDA (PC, `--engine ida`) or Ghidra (PS2,
+    `--engine ghidra`) over MCP.
+  - `autocorrelate.py` -- scores PS2<->PC candidates by shared anchors
+    (TF-IDF-weighted; strings and rare constants dominate, trivial values are
+    stop-listed), with `high`/`medium`/`low` confidence and evidence. It only
+    proposes; it never marks `validated`. `correlate_pc.py --manual` folds the
+    output into the worklist.
+  - Validated on ground truth: it independently recovers
+    `cam3GetShakeHeight -> sub_4FFC40` and `cam3DecidePosition -> sub_5009D0`
+    at `high` confidence (the same camera functions found by hand for the 60 fps
+    head-bob fix), keyed off the rare footstep-SFX id `0x9C51` and PI constants.
+
+- **Lua <-> SDK bridge.** `generate_lua_symbols.py` emits
+  `scripts/sh4_symbols.lua` from the *validated* addresses in `src/sh4/addresses.h`
+  (plus any `status: validated` entry in `function_map.json`). The Lua runtime
+  (`src/scripting/lua_runtime.cpp`) auto-loads it as `sh4.sym` and exposes
+  page-validated memory accessors (`sh4.read_*` / `sh4.write_*` / `sh4.read_bytes`)
+  and an experimental `sh4.call_cdecl`. Scripts reference
+  `sh4.sym.kRenderFrameSecondsFloat` instead of raw addresses, so only
+  human-validated symbols ever reach a script. See `tools/sdk/sh4xe.example.lua`.

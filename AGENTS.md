@@ -12,12 +12,16 @@ that directly support those areas.
 - `src/core/`: DLL bootstrap, paths, logging, and runtime initialization.
 - `src/hooks/`: active MinHook-based native hooks.
 - `src/hooks/parked/`: disabled or experimental hook work kept for reference.
-  Camera responsiveness/mouselook, file loader, enemy spawn, and god mode work
-  is currently parked here and should not be re-enabled unless explicitly
-  requested.
+  Camera responsiveness/mouselook, file loader, enemy spawn, god mode, and an
+  experimental freecam (`freecam_hook.*`, see `docs/freecam_design.md`) are
+  currently parked here and should not be re-enabled unless explicitly requested.
+  Parked files are not part of the build.
 - `src/render/`: D3D8 overlay console, display handling, lighting, and render
   tweaks.
-- `src/scripting/`: minimal embedded Lua support.
+- `src/scripting/`: embedded Lua. Exposes a global `sh4` table (page-validated
+  `read_*`/`write_*` memory accessors and an experimental `call_cdecl`) and
+  auto-loads `scripts/sh4_symbols.lua` as `sh4.sym` (validated addresses generated
+  by `tools/sdk/generate_lua_symbols.py`).
 - `src/sh4/`: recovered SH4 addresses and lightweight game-structure notes.
 - `docs/`: reversing notes and writeups.
 - `tools/`: offline developer tooling, not runtime `scripts/`.
@@ -87,6 +91,12 @@ matching `v*` trigger the release workflow, which creates a prerelease containin
 - `tools/dwarf1/` is for source-level debug recovery from the PS2 E3 trial ELF's
   DWARF v1 `.debug` and `.line` sections. See `tools/dwarf1/README.md` and
   `docs/sh4_debug_section_analysis.html` before changing it.
+- `tools/sdk/` turns the PS2 DWARF model into reviewable Windows modding
+  artifacts and proposes PS2->PC function matches. `autocorrelate.py` scores
+  candidates from per-function anchors (strings + rare constants) exported over
+  MCP by `export_anchors.py` (via `mcp_client.py`); it only proposes, never
+  validates. `generate_lua_symbols.py` emits the Lua `sh4.sym` table from
+  validated addresses. See `tools/sdk/README.md`.
 - DWARF JSON outputs (`model.json`, `summary.json`, `srctree.json`,
   `samples.json`) are reproducible and ignored. Regenerate them locally when
   needed instead of committing them.

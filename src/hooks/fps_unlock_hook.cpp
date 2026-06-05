@@ -92,6 +92,12 @@ std::mutex g_applyMutex;
 // needed on the engine side.
 float g_bobIncrementStep30 = 1.0f / 30.0f;
 float g_bobIncrementStep15 = 1.0f / 15.0f;
+// The vertical head bob (sub_4FFC40, cam3GetShakeHeight) advances its own phase by
+// `clamp(speed) * (PI/15)` per step with no delta-time, so it doubles at 60 like the
+// sway sites. Held at (PI/15)*30/fps (== PI/15 at the stock 30, so the redirect is a
+// no-op when the unlock is off). See addresses.h: kCamBobShakeIncrement*.
+constexpr double kBobShakePhaseStep30 = 0.20943951023931953; // PI/15, stock per-step advance
+float g_bobShakeIncrement = static_cast<float>(kBobShakePhaseStep30);
 std::atomic<bool> g_bobRedirected{false};
 
 int ClampedFps(int fps)
@@ -201,16 +207,23 @@ void EnsureBobIncrementRedirect()
     const bool d = RedirectBobSite(sh4::addr::kCamLookPitchIncrementSite15,
                                    sh4::addr::kCamBobIncrementConst15,
                                    &g_bobIncrementStep15);
+    // The vertical head bob proper (cam3GetShakeHeight / sub_4FFC40): the one the
+    // player actually feels as "walking on their toes" at 60. Separate phase + const
+    // from the sway sites above, which is why it was previously missed.
+    const bool e = RedirectBobSite(sh4::addr::kCamBobShakeIncrementSite,
+                                   sh4::addr::kCamBobShakeIncrementConst,
+                                   &g_bobShakeIncrement);
 
     // One-shot: .text is fully mapped before the first frame, so any failure here
     // is a permanent byte mismatch (unexpected build), not a transient miss --
     // retrying would only spam the log.
-    sh4xe::Log("camera fps fix: fixed-step increment redirect %s (bob 1/30=%d,%d bob 1/15=%d look 1/15=%d)",
-               (a && b && c && d) ? "active" : "partial",
+    sh4xe::Log("camera fps fix: fixed-step increment redirect %s (sway 1/30=%d,%d sway 1/15=%d look 1/15=%d bob pi/15=%d)",
+               (a && b && c && d && e) ? "active" : "partial",
                static_cast<int>(a),
                static_cast<int>(b),
                static_cast<int>(c),
-               static_cast<int>(d));
+               static_cast<int>(d),
+               static_cast<int>(e));
 }
 
 // Applies the whole timing configuration as one coherent set, all derived from a
@@ -226,6 +239,9 @@ bool ApplyTimingState()
     // are no-ops at the stock 30 (1/30 and 1/15).
     g_bobIncrementStep30 = static_cast<float>(frameSeconds);
     g_bobIncrementStep15 = static_cast<float>(2.0 * frameSeconds);
+    // Vertical head bob: (PI/15) * 30/fps, the same "30/fps" scaling expressed for the
+    // PI/15 per-step advance. Equals PI/15 at the stock 30, so inert when the unlock is off.
+    g_bobShakeIncrement = static_cast<float>(kBobShakePhaseStep30 * 30.0 / static_cast<double>(fps));
 
     std::lock_guard<std::mutex> lock(g_applyMutex);
 
