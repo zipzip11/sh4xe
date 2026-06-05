@@ -14,3 +14,6 @@ __pycache__/
 
 # Generated DWARF1 recovery artifacts (reproducible via tools/dwarf1/*.py)
 tools/dwarf1/*.json
+
+# Generated SDK recovery artifacts
+tools/sdk/generated/

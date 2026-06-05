@@ -2,9 +2,37 @@
 """Fully decode a handful of structs / functions / enums into clean C, resolving
 pointer-modifier blocks and type refs. Prototypes the importer transform and
 produces the evidence embedded in the HTML deliverable. Emits samples.json."""
-import struct, json, collections
-ELF=r"C:\Users\tux\Downloads\Silent Hill 4 - E3 Trial Version (E3 2004)\SILENT_HILL_4_VER_E3\SLUS_208.73"
-data=open(ELF,"rb").read()
+import argparse
+import struct
+
+from tool_paths import (
+    add_elf_argument,
+    add_output_argument,
+    fail,
+    read_elf_bytes,
+    resolve_elf_path,
+    resolve_output_path,
+    write_json,
+)
+
+
+DEFAULT_STRUCTS = ["sfCharacter", "ktLight", "ktScene", "sgAnime", "sfCldObject", "sgIKHandle"]
+DEFAULT_FUNC_PREFIXES = ("sfCharacter", "sgAnime", "ktLight", "GetRootTrans", "sfCld")
+
+parser = argparse.ArgumentParser(description="Resolve sample DWARF structs, functions, and enums to C-like output.")
+add_elf_argument(parser)
+add_output_argument(parser, "samples.json")
+parser.add_argument("--struct", dest="structs", action="append", help="Struct name to emit. May be repeated.")
+parser.add_argument("--func-prefix", dest="func_prefixes", action="append", help="Function name prefix to emit. May be repeated.")
+parser.add_argument("--enum-count", type=int, default=2, help="Number of enums to sample. Default: 2.")
+args = parser.parse_args()
+
+try:
+    ELF = resolve_elf_path(args.elf)
+    OUT = resolve_output_path(args.output, "samples.json")
+    data = read_elf_bytes(ELF)
+except Exception as exc:
+    fail(str(exc))
 (e_shoff,)=struct.unpack_from("<I",data,32)
 ess,esn,esi=struct.unpack_from("<HHH",data,46)
 secs=[struct.unpack_from("<IIIIIIIIII",data,e_shoff+i*ess) for i in range(esn)]
@@ -12,6 +40,8 @@ sh=secs[esi][4]
 def sn(o):
     e=data.find(b"\0",sh+o);return data[sh+o:e].decode("latin1")
 byn={sn(s[0]):s for s in secs}
+if ".debug" not in byn:
+    fail(f"{ELF} is missing required .debug section")
 DB,DS=byn[".debug"][4],byn[".debug"][5]
 
 def rattr(p):
@@ -124,9 +154,9 @@ def children(i):
         j+=1
     return res
 
-want_structs=["sfCharacter","ktLight","ktScene","sgAnime","sfCldObject","sgIKHandle"]
-want_funcs_prefix=("sfCharacter","sgAnime","ktLight","GetRootTrans","sfCld")
-want_enums=2
+want_structs = args.structs or DEFAULT_STRUCTS
+want_funcs_prefix = tuple(args.func_prefixes) if args.func_prefixes else DEFAULT_FUNC_PREFIXES
+want_enums = max(0, args.enum_count)
 
 out={"structs":[],"funcs":[],"enums":[]}
 
@@ -181,7 +211,8 @@ for i,(off,tag,L,at) in enumerate(dies):
         ec+=1
     if ec>=want_enums:break
 
-json.dump(out,open("samples.json","w"),indent=1)
+write_json(OUT, out, indent=1)
+print(f"samples written: {OUT}")
 
 # pretty print as C
 def fmt_member(m):

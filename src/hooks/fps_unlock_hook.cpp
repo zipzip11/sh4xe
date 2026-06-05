@@ -79,15 +79,17 @@ bool g_installed = false;
 LONGLONG g_qpcFrequency = 0;
 std::mutex g_applyMutex;
 
-// DLL-owned per-frame increments that the procedural camera "head bob" / walk-sway
-// fmul sites are repointed to (see addresses.h: kCamBobIncrement*). The bob phase
-// advances `phase += move_speed * STEP` once per simulation step, with STEP inlined
-// as the stock frame time (1/30 or 1/15) instead of Game_GetFrameSeconds(), so it
-// runs at 2x at 60 steps/sec. Holding STEP at the correct per-frame value --
-// (1/30)*30/fps = 1/fps and (1/15)*30/fps = 2/fps -- keeps the bob real-time-correct.
-// At the stock 30 these equal 1/30 and 1/15, so the redirect is a no-op when off.
-// The game reads these via absolute-address fmul; aligned 4-byte float access is
-// atomic, so no lock is needed on the engine side.
+// DLL-owned per-frame increments that fixed-step camera fmul sites are repointed
+// to (see addresses.h: kCamBobIncrement* / kCamLookPitchIncrementSite15). The
+// bob phase advances `phase += move_speed * STEP` once per simulation step, with
+// STEP inlined as the stock frame time (1/30 or 1/15) instead of
+// Game_GetFrameSeconds(), so it runs at 2x at 60 steps/sec. Gamepad look pitch
+// has the same per-step `input * 1/15` idiom. Holding STEP at the correct
+// per-frame value -- (1/30)*30/fps = 1/fps and (1/15)*30/fps = 2/fps -- keeps
+// those camera motions real-time-correct. At the stock 30 these equal 1/30 and
+// 1/15, so the redirect is a no-op when off. The game reads these via
+// absolute-address fmul; aligned 4-byte float access is atomic, so no lock is
+// needed on the engine side.
 float g_bobIncrementStep30 = 1.0f / 30.0f;
 float g_bobIncrementStep15 = 1.0f / 15.0f;
 std::atomic<bool> g_bobRedirected{false};
@@ -196,15 +198,19 @@ void EnsureBobIncrementRedirect()
     const bool c = RedirectBobSite(sh4::addr::kCamBobIncrementSite15,
                                    sh4::addr::kCamBobIncrementConst15,
                                    &g_bobIncrementStep15);
+    const bool d = RedirectBobSite(sh4::addr::kCamLookPitchIncrementSite15,
+                                   sh4::addr::kCamBobIncrementConst15,
+                                   &g_bobIncrementStep15);
 
     // One-shot: .text is fully mapped before the first frame, so any failure here
     // is a permanent byte mismatch (unexpected build), not a transient miss --
     // retrying would only spam the log.
-    sh4xe::Log("bob fps fix: walk-sway increment redirect %s (1/30 sites=%d,%d 1/15 site=%d)",
-               (a && b && c) ? "active" : "partial",
+    sh4xe::Log("camera fps fix: fixed-step increment redirect %s (bob 1/30=%d,%d bob 1/15=%d look 1/15=%d)",
+               (a && b && c && d) ? "active" : "partial",
                static_cast<int>(a),
                static_cast<int>(b),
-               static_cast<int>(c));
+               static_cast<int>(c),
+               static_cast<int>(d));
 }
 
 // Applies the whole timing configuration as one coherent set, all derived from a

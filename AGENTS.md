@@ -12,8 +12,9 @@ that directly support those areas.
 - `src/core/`: DLL bootstrap, paths, logging, and runtime initialization.
 - `src/hooks/`: active MinHook-based native hooks.
 - `src/hooks/parked/`: disabled or experimental hook work kept for reference.
-  The camera responsiveness/mouselook hook is currently parked here and should
-  not be re-enabled unless explicitly requested.
+  Camera responsiveness/mouselook, file loader, enemy spawn, and god mode work
+  is currently parked here and should not be re-enabled unless explicitly
+  requested.
 - `src/render/`: D3D8 overlay console, display handling, lighting, and render
   tweaks.
 - `src/scripting/`: minimal embedded Lua support.
@@ -68,11 +69,12 @@ Visual Studio defaults.
 The DLL writes `scripts/sh4xe.log` next to the game executable and loads optional
 `scripts/sh4xe.lua`. The D3D8 console is toggled with backtick. Current active
 commands cover `help`, `clear`, `echo`, `display`, `filter`, `fog`, `fov`,
-`fps`, `god`, `graphics`, `lighting`, and `spawn`.
+`fps`, `graphics`, and `lighting`.
 
-The camera responsiveness/mouselook hook is disabled and parked in
-`src/hooks/parked/`. The overlay still reports old `camera`/`mouselook` inputs as
-parked so stale notes do not silently appear to work.
+The camera responsiveness/mouselook, file loader, enemy spawn, and god mode
+hooks are disabled and parked in `src/hooks/parked/`. The overlay still reports
+old `camera`/`mouselook`, `god`, and `spawn`/`enemy`/`summon` inputs as parked so
+stale notes do not silently appear to work.
 
 Releases are experimental research snapshots, not stable modpack builds. Tags
 matching `v*` trigger the release workflow, which creates a prerelease containing
@@ -88,9 +90,8 @@ matching `v*` trigger the release workflow, which creates a prerelease containin
 - DWARF JSON outputs (`model.json`, `summary.json`, `srctree.json`,
   `samples.json`) are reproducible and ignored. Regenerate them locally when
   needed instead of committing them.
-- The DWARF extractor and Ghidra scripts currently contain machine-specific paths
-  to the trial ELF and `model.json`; update those paths locally if the checkout
-  moves.
+- The DWARF helper scripts accept the trial ELF path as a CLI argument and prompt
+  when it is omitted. The Ghidra scripts prompt for `model.json` at run time.
 
 ## Guidelines
 

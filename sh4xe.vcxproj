@@ -92,11 +92,8 @@
     <ClCompile Include="src\core\framework.cpp" />
     <ClCompile Include="src\hooks\d3d8_hook.cpp" />
     <ClCompile Include="src\hooks\dinput8_hook.cpp" />
-    <ClCompile Include="src\hooks\enemy_spawn_hook.cpp" />
-    <ClCompile Include="src\hooks\file_loader_hook.cpp" />
     <ClCompile Include="src\hooks\fov_hook.cpp" />
     <ClCompile Include="src\hooks\fps_unlock_hook.cpp" />
-    <ClCompile Include="src\hooks\god_mode_hook.cpp" />
     <ClCompile Include="src\hooks\hook_utils.cpp" />
     <ClCompile Include="src\hooks\intro_skip_hook.cpp" />
     <ClCompile Include="src\hooks\minhook_manager.cpp" />
@@ -152,11 +149,8 @@
     <ClInclude Include="src\core\framework.h" />
     <ClInclude Include="src\hooks\d3d8_hook.h" />
     <ClInclude Include="src\hooks\dinput8_hook.h" />
-    <ClInclude Include="src\hooks\enemy_spawn_hook.h" />
-    <ClInclude Include="src\hooks\file_loader_hook.h" />
     <ClInclude Include="src\hooks\fov_hook.h" />
     <ClInclude Include="src\hooks\fps_unlock_hook.h" />
-    <ClInclude Include="src\hooks\god_mode_hook.h" />
     <ClInclude Include="src\hooks\hook_utils.h" />
     <ClInclude Include="src\hooks\intro_skip_hook.h" />
     <ClInclude Include="src\hooks\minhook_manager.h" />
@@ -173,6 +167,14 @@
     <ClInclude Include="src\sh4\inventory.h" />
     <ClInclude Include="src\sh4\player.h" />
     <None Include="scripts\deploy.ps1" />
+    <None Include="src\hooks\parked\camera_responsiveness_hook.cpp" />
+    <None Include="src\hooks\parked\camera_responsiveness_hook.h" />
+    <None Include="src\hooks\parked\enemy_spawn_hook.cpp" />
+    <None Include="src\hooks\parked\enemy_spawn_hook.h" />
+    <None Include="src\hooks\parked\file_loader_hook.cpp" />
+    <None Include="src\hooks\parked\file_loader_hook.h" />
+    <None Include="src\hooks\parked\god_mode_hook.cpp" />
+    <None Include="src\hooks\parked\god_mode_hook.h" />
     <None Include="src\proxy\dsound.def" />
   </ItemGroup>
 

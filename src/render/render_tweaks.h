@@ -55,7 +55,20 @@ bool SuppressFilterOverride();
 
 // Lightweight DX8 lighting enhancement. It combines fixed-function light/material
 // boosting with a shaderless end-of-scene grade pass.
+enum class LightingPreset
+{
+    Game,
+    Modern,
+    Bright,
+    Soft,
+};
+
 void ResetLightingTweak();
+void ApplyLightingPreset(LightingPreset preset);
+LightingPreset CurrentLightingPreset();
+const char* LightingPresetName(LightingPreset preset);
+unsigned int LightingRevision();
+
 void SetLightingEnabled(bool enabled);
 bool LightingEnabled();
 

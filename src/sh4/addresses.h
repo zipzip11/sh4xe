@@ -5,72 +5,11 @@
 namespace sh4xe::sh4::addr
 {
 
-// GOG-version room memory limit writes used by the archived randomizer. They
-// are recorded here for future hooks; the bootstrap does not patch gameplay.
-inline constexpr uintptr_t kRoomMemoryLimitWriteA = 0x00551F98;
-inline constexpr uintptr_t kRoomMemoryLimitWriteB = 0x00551FA9;
-inline constexpr uintptr_t kRoomMemoryLimitWriteC = 0x00551FC5;
-
-inline constexpr int kRoomMemoryLimit134Mb = 0x08000000;
-inline constexpr int kRoomMemoryHalfLimit32Mb = 0x02000000;
-
 // Global where the game stores its IDirect3DDevice8* after CreateDevice
 // succeeds (see graphics init sub_402F20: &dword_6E7D94 is the returned-device
 // out-param). The EXE has a fixed base (0x00400000, no ASLR), so this absolute
 // address is stable. We poll it to hook the device without racing startup.
 inline constexpr uintptr_t kDirect3DDevice8Ptr = 0x006E7D94;
-
-// int __cdecl load_file_by_id(int fileId)
-inline constexpr uintptr_t kLoadFileById = 0x00573470;
-
-// int __cdecl finalize_resource_load(int wait)
-// The game calls this with 0 after issuing resource loads to flush the loader
-// queue before fetching model/texture pointers.
-inline constexpr uintptr_t kFinalizeResourceLoad = 0x00573370;
-
-// Enemy resource mappers used by the room-spawn path. They turn the game's
-// enemy type/variant pair into file IDs consumed by load_file_by_id.
-inline constexpr uintptr_t kEnemyModelFileIdForType = 0x00466C60;
-inline constexpr uintptr_t kEnemyTextureFileIdForType = 0x00466F10;
-inline constexpr uintptr_t kEnemyExtraFileIdForType = 0x004671C0;
-
-// Active character task list head. The first entry is a reliable gameplay
-// anchor for player-relative console spawns once a room is live.
-inline constexpr uintptr_t kCharacterTaskListHead = 0x00FCEFC0;
-
-// Enemy/character task creation path mirrored from Room_SpawnEnemy
-// (sub_486070). We call the lower-level cdecl helpers directly instead of the
-// original ESI-based room-spawn wrapper.
-inline constexpr uintptr_t kGetCharacterPositionVector = 0x0045CD90;
-inline constexpr uintptr_t kCreateCharacterTask = 0x0045C280;
-inline constexpr uintptr_t kSetupEnemyBase = 0x0045CA70;
-inline constexpr uintptr_t kAttachEnemyModel = 0x0045E110;
-inline constexpr uintptr_t kAllocateEnemyExtra = 0x0045BE70;
-inline constexpr uintptr_t kSetEnemyScale = 0x0045E0A0;
-inline constexpr uintptr_t kSetupCharacterCollision = 0x00455920;
-inline constexpr uintptr_t kSetEnemyStateSlot = 0x0045B8B0;
-inline constexpr uintptr_t kLinkCharacterTask = 0x0045E630;
-inline constexpr uintptr_t kSetEnemyMode = 0x0045B850;
-inline constexpr uintptr_t kEnemyTaskUpdate = 0x00486030;
-inline constexpr uintptr_t kEnemyTaskStep = 0x00485D70;
-
-// Henry/player runtime anchors.
-// Player_Update (sub_53C250) reads the pending impact value through
-// Player_GetPendingImpact and routes non-zero values into the hit/knockback
-// handlers. Normal enemy/contact damage is accumulated by
-// Player_AccumulateContactImpact into kPlayerPendingContactImpact[player].
-inline constexpr uintptr_t kPlayerUpdate = 0x0053C250;
-inline constexpr uintptr_t kPlayerAccumulateContactImpact = 0x0053F4E0;
-inline constexpr uintptr_t kPlayerGetPendingImpact = 0x0053F6D0;
-inline constexpr uintptr_t kPlayerUpdateImpactTimer = 0x0053F6E0;
-inline constexpr uintptr_t kPlayerStateBase = 0x010A0F20;
-inline constexpr uintptr_t kPlayerContactCount = 0x010A3350;
-inline constexpr uintptr_t kPlayerContactList = 0x010A33C0;
-inline constexpr uintptr_t kPlayerPendingImpact = 0x010A3A00;
-inline constexpr uintptr_t kPlayerPendingContactImpact = 0x010A3A04;
-inline constexpr uintptr_t kPlayerImpactTimer = 0x010A39C0;
-inline constexpr uintptr_t kPlayerStance = 0x010A39C8;
-inline constexpr uintptr_t kPlayerFacingRadians = 0x010A39D0;
 
 // int __cdecl Camera_SetFovRadians(Camera* camera, float vfov)
 // The lowest-level vertical-FOV setter. It clamps vfov to
@@ -85,14 +24,6 @@ inline constexpr uintptr_t kCameraSetFovRadians = 0x0041C990;
 // Default vertical FOV the game seeds at camera init: 0x3F1C61AA float bits,
 // i.e. 0.61086524 rad == 35.0 degrees (push @ 0x0055BD87).
 inline constexpr float kDefaultVerticalFovRadians = 0.61086524f;
-
-// double __cdecl Input_GetRightStickX(int player)
-// double __cdecl Input_GetRightStickY(int player)
-// Camera_GetLookInputH/V call through these after checking whether camera look
-// is currently allowed, so overriding here preserves the game's own menu/cutscene
-// gates and vertical-invert option while bypassing the stick deadzone path.
-inline constexpr uintptr_t kInputGetRightStickX = 0x00554350;
-inline constexpr uintptr_t kInputGetRightStickY = 0x00554370;
 
 // Central frame-rate helpers and scheduler globals. The main loop (WinMain @
 // 0x00414A50) is a real-time-gated FIXED-timestep scheduler: it runs exactly one
@@ -150,6 +81,7 @@ inline constexpr uintptr_t kRenderFrameStepTicks = 0x00ED57DC;
 inline constexpr uintptr_t kCamBobIncrementSite30A = 0x005345A9; // sub_534590 (camera mode 0)
 inline constexpr uintptr_t kCamBobIncrementSite30B = 0x00534647; // sub_534620 (camera mode 2)
 inline constexpr uintptr_t kCamBobIncrementSite15 = 0x0052D863;  // sub_52D710 (walk path)
+inline constexpr uintptr_t kCamLookPitchIncrementSite15 = 0x0052DC71; // sub_52DBD0 gamepad look pitch
 inline constexpr uintptr_t kCamBobIncrementConst30 = 0x005B7E80; // shared 1/30, expected operand
 inline constexpr uintptr_t kCamBobIncrementConst15 = 0x005B7E88; // shared 1/15, expected operand
 inline constexpr unsigned int kCamBobIncrementDispOffset = 2;    // operand offset within the fmul

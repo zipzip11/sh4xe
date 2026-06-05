@@ -17,12 +17,17 @@ Full writeup: [`../../docs/sh4_debug_section_analysis.html`](../../docs/sh4_debu
 | 4. Place typed globals at their addresses | `ghidra/Sh4Globals.java` | 3,376 typed · 4,041 labeled |
 
 ```bash
-python extract.py            # regenerates model.json from the ELF
+python extract.py /path/to/SLUS_208.73
 ```
 
+If the ELF path is omitted, the script prompts for it. Outputs default beside
+the tooling (`tools/dwarf1/model.json` here); use `-o <path>` to write elsewhere.
+
 Then in Ghidra (see Requirements) run `Sh4Types` → `Sh4Funcs` → `Sh4Globals`
-in that order. `Sh4Funcs` accepts an optional source-path substring arg to limit
-the apply to one module (e.g. `sf_chara.c`) for validation.
+in that order. Each Ghidra script prompts for `model.json` when it runs, so the
+scripts work from a fresh checkout without local path edits. `Sh4Funcs` accepts
+an optional source-path substring arg to limit the apply to one module
+(e.g. `sf_chara.c`) for validation.
 
 ## Exploration / analysis
 
@@ -39,6 +44,14 @@ Historical `probe*.py` scripts were one-off format-reversal scratch files and ar
 not kept in the repo. The durable evidence is in the HTML writeup plus the
 repeatable scripts above.
 
+Examples:
+
+```bash
+python analyze.py /path/to/SLUS_208.73
+python srctree.py /path/to/SLUS_208.73
+python samples.py /path/to/SLUS_208.73 --struct sfCharacter --func-prefix sfCharacter
+```
+
 ## Requirements
 
 - **Python 3** for the extractor (stdlib only).
@@ -46,13 +59,6 @@ repeatable scripts above.
   `GHIDRA_MCP_ALLOW_SCRIPTS=1`, and the `$USER_HOME/ghidra_scripts` bundle
   **enabled** in Script Manager → Bundle Manager. The applier scripts use Gson
   (bundled with Ghidra) to read `model.json`.
-
-## Machine-specific paths
-
-- `extract.py` hardcodes the ELF path under `~/Downloads/...`.
-- `ghidra/*.java` hardcode `MODEL = .../tools/dwarf1/model.json`.
-
-Adjust these if the repo or binary moves.
 
 ## Notes on the encoding (CodeWarrior DWARF 1)
 
@@ -65,3 +71,9 @@ Adjust these if the repo or binary moves.
   names (picking the largest definition as canonical).
 
 Generated `*.json` are git-ignored (reproducible from the scripts).
+
+## SDK workflow notes
+
+For a concise discussion of turning the PS2 E3 Ghidra database into practical
+Windows modding artifacts, see
+[`../../docs/sh4_sdk_workflow.md`](../../docs/sh4_sdk_workflow.md).

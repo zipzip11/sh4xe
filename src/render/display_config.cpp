@@ -22,6 +22,35 @@ struct PendingChange
     UINT height = 0;
 };
 
+struct DisplayMode
+{
+    UINT Width;
+    UINT Height;
+    UINT RefreshRate;
+    DWORD Format;
+};
+
+struct DeviceCreationParameters
+{
+    UINT AdapterOrdinal;
+    DWORD DeviceType;
+    HWND hFocusWindow;
+    DWORD BehaviorFlags;
+};
+
+using GetDisplayModeFn = HRESULT(__stdcall*)(void*, DisplayMode*);
+using GetCreationParametersFn = HRESULT(__stdcall*)(void*, DeviceCreationParameters*);
+
+constexpr size_t kVtblGetDisplayMode = 8;
+constexpr size_t kVtblGetCreationParameters = 9;
+
+constexpr DWORD kD3DFMT_A8R8G8B8 = 21;
+constexpr DWORD kD3DFMT_D24S8 = 75;
+constexpr DWORD kD3DSWAPEFFECT_COPY_VSYNC = 4;
+constexpr DWORD kD3DPRESENTFLAG_LOCKABLE_BACKBUFFER = 1;
+constexpr UINT kD3DPRESENT_INTERVAL_DEFAULT = 0;
+constexpr UINT kD3DPRESENT_INTERVAL_ONE = 1;
+
 std::mutex g_mutex;
 PresentParameters g_present = {};
 bool g_havePresent = false;
@@ -160,6 +189,15 @@ void EnsureFullscreenSize(PresentParameters& params, HWND hwnd)
     params.BackBufferHeight = static_cast<UINT>(std::max<LONG>(1, monitor.bottom - monitor.top));
 }
 
+bool LooksWindowed(HWND hwnd)
+{
+    if (!hwnd)
+        return false;
+
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+    return (style & (WS_CAPTION | WS_THICKFRAME | WS_BORDER)) != 0;
+}
+
 void CaptureLocked(const PresentParameters* params)
 {
     if (!params)
@@ -172,6 +210,33 @@ void CaptureLocked(const PresentParameters* params)
     g_mode = params->Windowed ? g_mode : Mode::Fullscreen;
     if (params->Windowed && g_mode == Mode::Fullscreen)
         g_mode = Mode::Windowed;
+}
+
+void CaptureFallbackLocked(HWND hwnd, const DisplayMode& mode)
+{
+    if (g_havePresent)
+        return;
+
+    g_window = hwnd ? hwnd : g_window;
+    const bool windowed = LooksWindowed(g_window);
+
+    g_present = {};
+    g_present.BackBufferWidth = mode.Width ? mode.Width : 640;
+    g_present.BackBufferHeight = mode.Height ? mode.Height : 480;
+    g_present.BackBufferFormat = mode.Format ? mode.Format : kD3DFMT_A8R8G8B8;
+    g_present.BackBufferCount = 1;
+    g_present.MultiSampleType = 0;
+    g_present.SwapEffect = kD3DSWAPEFFECT_COPY_VSYNC;
+    g_present.hDeviceWindow = g_window;
+    g_present.Windowed = windowed ? TRUE : FALSE;
+    g_present.EnableAutoDepthStencil = TRUE;
+    g_present.AutoDepthStencilFormat = kD3DFMT_D24S8;
+    g_present.Flags = kD3DPRESENTFLAG_LOCKABLE_BACKBUFFER;
+    g_present.FullScreen_RefreshRateInHz = 0;
+    g_present.FullScreen_PresentationInterval = windowed ? kD3DPRESENT_INTERVAL_DEFAULT : kD3DPRESENT_INTERVAL_ONE;
+
+    g_havePresent = true;
+    g_mode = windowed ? Mode::Windowed : Mode::Fullscreen;
 }
 
 void QueueLocked(const PendingChange& change)
@@ -217,6 +282,41 @@ void CaptureReset(const PresentParameters* params)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     CaptureLocked(params);
+}
+
+void CaptureDeviceFallback(void* device)
+{
+    if (!device)
+        return;
+
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        if (g_havePresent)
+            return;
+    }
+
+    void** vtbl = *reinterpret_cast<void***>(device);
+    const auto getDisplayMode = reinterpret_cast<GetDisplayModeFn>(vtbl[kVtblGetDisplayMode]);
+    const auto getCreationParameters =
+        reinterpret_cast<GetCreationParametersFn>(vtbl[kVtblGetCreationParameters]);
+
+    DisplayMode mode = {};
+    DeviceCreationParameters creation = {};
+    if (FAILED(getDisplayMode(device, &mode)))
+        return;
+    if (FAILED(getCreationParameters(device, &creation)))
+        creation.hFocusWindow = nullptr;
+
+    std::lock_guard<std::mutex> lock(g_mutex);
+    CaptureFallbackLocked(creation.hFocusWindow, mode);
+    if (g_havePresent)
+    {
+        sh4xe::Log("display fallback captured mode=%s resolution=%ux%u format=%lu",
+                   ModeName(g_mode),
+                   g_present.BackBufferWidth,
+                   g_present.BackBufferHeight,
+                   static_cast<unsigned long>(g_present.BackBufferFormat));
+    }
 }
 
 bool RequestMode(Mode mode, char* out, size_t outSize)

@@ -14,12 +14,11 @@ public class Sh4Globals extends GhidraScript {
     Map<Integer, JsonObject> rec = new HashMap<>();
     Map<Integer, DataType> cache = new HashMap<>();
     int nData, nLabel, nDataErr, nErr, nSkipCode;
-    String MODEL = "C:/Users/tux/Projects/sh4xe/tools/dwarf1/model.json";
-
     public void run() throws Exception {
         dtm = currentProgram.getDataTypeManager();
+        File modelFile = askModelFile();
         JsonObject root;
-        try (Reader r = new BufferedReader(new FileReader(MODEL))) {
+        try (Reader r = new BufferedReader(new FileReader(modelFile))) {
             root = JsonParser.parseReader(r).getAsJsonObject();
         }
         JsonObject types = root.getAsJsonObject("types");
@@ -53,6 +52,14 @@ public class Sh4Globals extends GhidraScript {
         }
         println("data=" + nData + " labels=" + nLabel + " dataErr=" + nDataErr
                 + " skippedInCode=" + nSkipCode + " err=" + nErr);
+    }
+
+    File askModelFile() throws Exception {
+        File modelFile = askFile("Select DWARF model.json", "Open");
+        if (modelFile == null || !modelFile.isFile())
+            throw new FileNotFoundException("Select an existing model.json");
+        println("model: " + modelFile.getAbsolutePath());
+        return modelFile;
     }
 
     DataType resolve(JsonObject ref) {

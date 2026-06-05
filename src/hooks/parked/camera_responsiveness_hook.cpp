@@ -1,9 +1,10 @@
-#include "camera_responsiveness_hook.h"
+// PARKED: experimental camera responsiveness/mouselook work. This file is kept
+// for reference under src/hooks/parked and is not compiled by the active project.
+#include "hooks/parked/camera_responsiveness_hook.h"
 
 #include "core/framework.h"
 #include "hooks/hook_utils.h"
 #include "render/d3d8_console.h"
-#include "sh4/addresses.h"
 
 #include <windows.h>
 
@@ -11,6 +12,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 
 namespace sh4xe::hooks::camera
@@ -29,6 +31,8 @@ using SyncCameraStateFn = int(__cdecl*)();
 constexpr uintptr_t kCameraSyncState = 0x00532990; // sub_532990
 constexpr uintptr_t kCameraMasterYaw = 0x010A0FC4;
 constexpr uintptr_t kCameraWorkingYaw = 0x010A1BF4;
+constexpr uintptr_t kInputGetRightStickX = 0x00554350;
+constexpr uintptr_t kInputGetRightStickY = 0x00554370;
 
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kTwoPi = kPi * 2.0f;
@@ -199,11 +203,11 @@ bool InstallCameraResponsivenessHook()
         return true;
 
     const bool hookX = CreateAndEnableHook("Input_GetRightStickX",
-                                           sh4::addr::kInputGetRightStickX,
+                                           kInputGetRightStickX,
                                            reinterpret_cast<void*>(&GetRightStickXDetour),
                                            &g_originalGetRightStickX);
     const bool hookY = CreateAndEnableHook("Input_GetRightStickY",
-                                           sh4::addr::kInputGetRightStickY,
+                                           kInputGetRightStickY,
                                            reinterpret_cast<void*>(&GetRightStickYDetour),
                                            &g_originalGetRightStickY);
     const bool hookSync = CreateAndEnableHook("Camera_SyncState",
@@ -215,8 +219,8 @@ bool InstallCameraResponsivenessHook()
 
     g_installed = true;
     sh4xe::Log("camera responsive mouse hook active (persistent yaw model) @ %p/%p sync=%p",
-               reinterpret_cast<void*>(sh4::addr::kInputGetRightStickX),
-               reinterpret_cast<void*>(sh4::addr::kInputGetRightStickY),
+               reinterpret_cast<void*>(kInputGetRightStickX),
+               reinterpret_cast<void*>(kInputGetRightStickY),
                reinterpret_cast<void*>(kCameraSyncState));
     return true;
 }

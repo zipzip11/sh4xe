@@ -2,7 +2,6 @@
 
 #include "core/framework.h"
 #include "hooks/fps_unlock_hook.h"
-#include "hooks/god_mode_hook.h"
 #include "hooks/hook_utils.h"
 #include "render/d3d8_console.h"
 #include "render/d3d8_lighting.h"
@@ -27,9 +26,12 @@ using CreateDeviceFn = HRESULT(__stdcall*)(void*, UINT, DWORD, HWND, DWORD, void
 using EndSceneFn = HRESULT(__stdcall*)(void*);
 using ResetFn = HRESULT(__stdcall*)(void*, render::display::PresentParameters*);
 using SetRenderStateFn = HRESULT(__stdcall*)(void*, DWORD, DWORD);
+using GetRenderStateFn = HRESULT(__stdcall*)(void*, DWORD, DWORD*);
 using SetTextureStageStateFn = HRESULT(__stdcall*)(void*, DWORD, DWORD, DWORD);
 using SetMaterialFn = HRESULT(__stdcall*)(void*, const void*);
+using GetMaterialFn = HRESULT(__stdcall*)(void*, void*);
 using SetLightFn = HRESULT(__stdcall*)(void*, DWORD, const void*);
+using GetLightFn = HRESULT(__stdcall*)(void*, DWORD, void*);
 using ReleaseFn = ULONG(__stdcall*)(void*);
 
 constexpr UINT kD3d8SdkVersion = 120;
@@ -38,8 +40,11 @@ constexpr UINT kD3d8SdkVersion = 120;
 constexpr size_t kVtblReset = 14;
 constexpr size_t kVtblEndScene = 35;
 constexpr size_t kVtblSetMaterial = 42;
+constexpr size_t kVtblGetMaterial = 43;
 constexpr size_t kVtblSetLight = 44;
+constexpr size_t kVtblGetLight = 45;
 constexpr size_t kVtblSetRenderState = 50;
+constexpr size_t kVtblGetRenderState = 51;
 constexpr size_t kVtblSetTextureStageState = 63;
 
 // D3DRENDERSTATETYPE / D3DTEXTURESTAGESTATETYPE / D3DTEXTUREFILTERTYPE values.
@@ -61,6 +66,7 @@ constexpr DWORD kD3DTEXF_LINEAR = 2;
 constexpr DWORD kD3DTEXF_ANISOTROPIC = 3;
 constexpr DWORD kForcedMaxAnisotropy = 16;
 constexpr DWORD kQualityTextureStages = 4;
+constexpr DWORD kMaxTrackedLights = 32;
 
 constexpr DWORD kD3DLIGHT_POINT = 1;
 constexpr DWORD kD3DLIGHT_SPOT = 2;
@@ -115,9 +121,18 @@ SetTextureStageStateFn g_originalSetTextureStageState = nullptr;
 SetMaterialFn g_originalSetMaterial = nullptr;
 SetLightFn g_originalSetLight = nullptr;
 std::mutex g_hookMutex;
+std::mutex g_lightingMutex;
 bool g_createDeviceHooked = false;
 bool g_endSceneHooked = false;
 unsigned int g_appliedGraphicsQualityRevision = 0;
+unsigned int g_appliedLightingRevision = 0;
+
+D3DMATERIAL8 g_cachedMaterial = {};
+bool g_haveCachedMaterial = false;
+D3DLIGHT8 g_cachedLights[kMaxTrackedLights] = {};
+bool g_haveCachedLight[kMaxTrackedLights] = {};
+DWORD g_cachedAmbient = 0;
+bool g_haveCachedAmbient = false;
 
 HRESULT __stdcall CreateDeviceDetour(void* self,
                                      UINT adapter,
@@ -131,6 +146,8 @@ HRESULT __stdcall ResetDetour(void* device, render::display::PresentParameters* 
 HRESULT __stdcall SetMaterialDetour(void* device, const void* material);
 HRESULT __stdcall SetLightDetour(void* device, DWORD index, const void* light);
 bool HookDevice(void* device);
+void SeedLightingCacheFromDevice(void* device);
+void ApplyLightingState(void* device, bool force);
 
 DWORD FloatToDword(float value)
 {
@@ -279,6 +296,122 @@ void ApplyMaterialTweak(D3DMATERIAL8& material)
         material.Power = 8.0f;
 }
 
+void CacheMaterial(const D3DMATERIAL8& material)
+{
+    std::lock_guard<std::mutex> lock(g_lightingMutex);
+    g_cachedMaterial = material;
+    g_haveCachedMaterial = true;
+}
+
+void CacheLight(DWORD index, const D3DLIGHT8& light)
+{
+    if (index >= kMaxTrackedLights)
+        return;
+
+    std::lock_guard<std::mutex> lock(g_lightingMutex);
+    g_cachedLights[index] = light;
+    g_haveCachedLight[index] = true;
+}
+
+void CacheAmbient(DWORD value)
+{
+    std::lock_guard<std::mutex> lock(g_lightingMutex);
+    g_cachedAmbient = value;
+    g_haveCachedAmbient = true;
+}
+
+void SeedLightingCacheFromDevice(void* device)
+{
+    if (!device)
+        return;
+
+    void** vtbl = *reinterpret_cast<void***>(device);
+    const auto getMaterial = reinterpret_cast<GetMaterialFn>(vtbl[kVtblGetMaterial]);
+    const auto getLight = reinterpret_cast<GetLightFn>(vtbl[kVtblGetLight]);
+    const auto getRenderState = reinterpret_cast<GetRenderStateFn>(vtbl[kVtblGetRenderState]);
+
+    D3DMATERIAL8 material = {};
+    if (getMaterial && SUCCEEDED(getMaterial(device, &material)))
+        CacheMaterial(material);
+
+    for (DWORD i = 0; i < kMaxTrackedLights; ++i)
+    {
+        D3DLIGHT8 light = {};
+        if (getLight && SUCCEEDED(getLight(device, i, &light)))
+            CacheLight(i, light);
+    }
+
+    DWORD ambient = 0;
+    if (getRenderState && SUCCEEDED(getRenderState(device, kD3DRS_AMBIENT, &ambient)))
+        CacheAmbient(ambient);
+}
+
+void ApplyLightingState(void* device, bool force)
+{
+    if (!device)
+        return;
+
+    const unsigned int revision = render::tweaks::LightingRevision();
+    if (!force && revision == g_appliedLightingRevision)
+        return;
+    g_appliedLightingRevision = revision;
+
+    D3DMATERIAL8 material = {};
+    bool haveMaterial = false;
+    D3DLIGHT8 lights[kMaxTrackedLights] = {};
+    bool haveLights[kMaxTrackedLights] = {};
+    DWORD ambient = 0;
+    bool haveAmbient = false;
+    {
+        std::lock_guard<std::mutex> lock(g_lightingMutex);
+        material = g_cachedMaterial;
+        haveMaterial = g_haveCachedMaterial;
+        for (DWORD i = 0; i < kMaxTrackedLights; ++i)
+        {
+            lights[i] = g_cachedLights[i];
+            haveLights[i] = g_haveCachedLight[i];
+        }
+        ambient = g_cachedAmbient;
+        haveAmbient = g_haveCachedAmbient;
+    }
+
+    const bool enabled = render::tweaks::LightingEnabled();
+
+    if (g_originalSetMaterial && haveMaterial)
+    {
+        D3DMATERIAL8 adjusted = material;
+        if (enabled)
+            ApplyMaterialTweak(adjusted);
+        g_originalSetMaterial(device, &adjusted);
+    }
+
+    if (g_originalSetLight)
+    {
+        for (DWORD i = 0; i < kMaxTrackedLights; ++i)
+        {
+            if (!haveLights[i])
+                continue;
+
+            D3DLIGHT8 adjusted = lights[i];
+            if (enabled)
+                ApplyLightTweak(adjusted);
+            g_originalSetLight(device, i, &adjusted);
+        }
+    }
+
+    if (g_originalSetRenderState)
+    {
+        const DWORD baseAmbient = haveAmbient ? ambient : 0;
+        g_originalSetRenderState(device, kD3DRS_AMBIENT, enabled ? BoostAmbientColor(baseAmbient) : baseAmbient);
+        if (enabled)
+        {
+            g_originalSetRenderState(device, kD3DRS_NORMALIZENORMALS, TRUE);
+            if (render::tweaks::LightingSpecularBoost() > 0.0f)
+                g_originalSetRenderState(device, kD3DRS_SPECULARENABLE, TRUE);
+        }
+    }
+}
+
 bool HookDirect3D8Interface(void* direct3d)
 {
     if (!direct3d)
@@ -305,13 +438,12 @@ bool HookDirect3D8Interface(void* direct3d)
 HRESULT __stdcall EndSceneDetour(void* device)
 {
     // Per-frame, game-thread ticks. FPS: race-free re-assertion of the timing
-    // globals (cheap, reads only unless something drifted). God mode clears any
-    // lingering Henry impact state. Both are safe if EndScene fires more than
-    // once per frame.
+    // globals (cheap, reads only unless something drifted). Safe if EndScene
+    // fires more than once per frame.
     hooks::fps::OnFramePresented();
-    hooks::god_mode::OnFramePresented();
 
     ApplyGraphicsQualityStates(device, false);
+    ApplyLightingState(device, false);
     render::d3d8_lighting::Render(device);
     render::d3d8_console::Render(device);
     const HRESULT hr = g_originalEndScene(device);
@@ -338,7 +470,9 @@ HRESULT __stdcall ResetDetour(void* device, render::display::PresentParameters* 
     if (SUCCEEDED(hr))
     {
         render::display::CaptureReset(presentationParameters);
+        SeedLightingCacheFromDevice(device);
         ApplyGraphicsQualityStates(device, true);
+        ApplyLightingState(device, true);
     }
     return hr;
 }
@@ -353,6 +487,9 @@ HRESULT __stdcall SetRenderStateDetour(void* device, DWORD state, DWORD value)
         value = ScaleFloatState(value, render::tweaks::FogDensityScale());
     else if (state == kD3DRS_DITHERENABLE && render::tweaks::DitherEnabled())
         value = TRUE;
+
+    if (state == kD3DRS_AMBIENT)
+        CacheAmbient(value);
 
     if (render::tweaks::LightingEnabled())
     {
@@ -371,11 +508,15 @@ HRESULT __stdcall SetMaterialDetour(void* device, const void* material)
 {
     if (material && render::tweaks::LightingEnabled())
     {
-        D3DMATERIAL8 adjusted = *static_cast<const D3DMATERIAL8*>(material);
+        const D3DMATERIAL8 original = *static_cast<const D3DMATERIAL8*>(material);
+        CacheMaterial(original);
+        D3DMATERIAL8 adjusted = original;
         ApplyMaterialTweak(adjusted);
         return g_originalSetMaterial(device, &adjusted);
     }
 
+    if (material)
+        CacheMaterial(*static_cast<const D3DMATERIAL8*>(material));
     return g_originalSetMaterial(device, material);
 }
 
@@ -383,7 +524,9 @@ HRESULT __stdcall SetLightDetour(void* device, DWORD index, const void* light)
 {
     if (light && render::tweaks::LightingEnabled())
     {
-        D3DLIGHT8 adjusted = *static_cast<const D3DLIGHT8*>(light);
+        const D3DLIGHT8 original = *static_cast<const D3DLIGHT8*>(light);
+        CacheLight(index, original);
+        D3DLIGHT8 adjusted = original;
         ApplyLightTweak(adjusted);
 
         if (g_originalSetRenderState)
@@ -396,6 +539,8 @@ HRESULT __stdcall SetLightDetour(void* device, DWORD index, const void* light)
         return g_originalSetLight(device, index, &adjusted);
     }
 
+    if (light)
+        CacheLight(index, *static_cast<const D3DLIGHT8*>(light));
     return g_originalSetLight(device, index, light);
 }
 
@@ -449,6 +594,8 @@ bool HookDevice(void* device)
 {
     if (!device)
         return false;
+
+    render::display::CaptureDeviceFallback(device);
 
     std::lock_guard<std::mutex> lock(g_hookMutex);
     if (g_endSceneHooked)
@@ -521,7 +668,9 @@ bool HookDevice(void* device)
         render::d3d8_console::AddLog("ok IDirect3DDevice8::SetTextureStageState hooked");
     }
 
+    SeedLightingCacheFromDevice(device);
     ApplyGraphicsQualityStates(device, true);
+    ApplyLightingState(device, true);
 
     return true;
 }

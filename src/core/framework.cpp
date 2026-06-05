@@ -2,10 +2,8 @@
 
 #include "hooks/d3d8_hook.h"
 #include "hooks/dinput8_hook.h"
-#include "hooks/file_loader_hook.h"
 #include "hooks/fov_hook.h"
 #include "hooks/fps_unlock_hook.h"
-#include "hooks/god_mode_hook.h"
 #include "hooks/intro_skip_hook.h"
 #include "hooks/minhook_manager.h"
 #include "render/d3d8_console.h"
@@ -67,13 +65,11 @@ DWORD WINAPI ModThread(LPVOID)
     }
 
     Log("MinHook initialized");
-    hooks::file_loader::InstallFileLoaderHook();
     hooks::d3d8::InstallConsoleHook();
     hooks::dinput8::InstallInputHook();
     hooks::fov::InstallFovHook();
     hooks::fps::InstallFpsUnlockHook();
-    hooks::god_mode::InstallGodModeHook();
-    Log("camera responsiveness hook parked; not installed");
+    Log("parked hooks not installed: camera responsiveness, file loader, enemy spawn, god mode");
     hooks::intro::InstallIntroSkipHook();
 
     scripting::LuaRuntime lua;

@@ -37,6 +37,7 @@ const char* ModeName(Mode mode);
 
 void CaptureCreateDevice(HWND focusWindow, const PresentParameters* params);
 void CaptureReset(const PresentParameters* params);
+void CaptureDeviceFallback(void* device);
 
 bool RequestMode(Mode mode, char* out, size_t outSize);
 bool RequestResolution(UINT width, UINT height, char* out, size_t outSize);

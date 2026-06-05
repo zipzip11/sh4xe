@@ -2,6 +2,9 @@
 
 #include <cstddef>
 
+// PARKED: experimental damage suppression. Not part of the active build unless
+// it is intentionally moved back out of src/hooks/parked.
+
 namespace sh4xe::hooks::god_mode
 {
 

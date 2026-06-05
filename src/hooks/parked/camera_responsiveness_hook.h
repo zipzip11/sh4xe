@@ -1,5 +1,8 @@
 #pragma once
 
+// PARKED: experimental camera responsiveness/mouselook work. Not part of the
+// active build unless it is intentionally moved back out of src/hooks/parked.
+
 namespace sh4xe::hooks::camera
 {
 

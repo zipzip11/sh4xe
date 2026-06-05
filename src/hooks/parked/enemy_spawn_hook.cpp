@@ -1,7 +1,8 @@
-#include "hooks/enemy_spawn_hook.h"
+// PARKED: experimental enemy spawn console support. This file is kept for
+// reference under src/hooks/parked and is not compiled by the active project.
+#include "hooks/parked/enemy_spawn_hook.h"
 
-#include "hooks/file_loader_hook.h"
-#include "sh4/addresses.h"
+#include "hooks/parked/file_loader_hook.h"
 
 #include <windows.h>
 
@@ -43,6 +44,23 @@ using SetEnemyFloatBitsFn = int(__cdecl*)(void*, int);
 using SetupCharacterCollisionFn = int(__cdecl*)(void*, int, int, int, int, float);
 using SetEnemyIntFn = int(__cdecl*)(void*, int);
 using LinkCharacterTaskFn = int(__cdecl*)(void*);
+
+constexpr uintptr_t kFinalizeResourceLoad = 0x00573370;
+constexpr uintptr_t kEnemyModelFileIdForType = 0x00466C60;
+constexpr uintptr_t kEnemyTextureFileIdForType = 0x00466F10;
+constexpr uintptr_t kEnemyExtraFileIdForType = 0x004671C0;
+constexpr uintptr_t kCharacterTaskListHead = 0x00FCEFC0;
+constexpr uintptr_t kCreateCharacterTask = 0x0045C280;
+constexpr uintptr_t kSetupEnemyBase = 0x0045CA70;
+constexpr uintptr_t kAttachEnemyModel = 0x0045E110;
+constexpr uintptr_t kAllocateEnemyExtra = 0x0045BE70;
+constexpr uintptr_t kSetEnemyScale = 0x0045E0A0;
+constexpr uintptr_t kSetupCharacterCollision = 0x00455920;
+constexpr uintptr_t kSetEnemyStateSlot = 0x0045B8B0;
+constexpr uintptr_t kLinkCharacterTask = 0x0045E630;
+constexpr uintptr_t kSetEnemyMode = 0x0045B850;
+constexpr uintptr_t kEnemyTaskUpdate = 0x00486030;
+constexpr uintptr_t kEnemyTaskStep = 0x00485D70;
 
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kTwoPi = 2.0f * kPi;
@@ -154,7 +172,7 @@ template<typename T> bool ReadGameValue(uintptr_t address, T& value)
 bool TryGetAnchorPosition(Vec3& position)
 {
     uintptr_t task = 0;
-    if (!ReadGameValue(sh4::addr::kCharacterTaskListHead, task) || task < 0x10000)
+    if (!ReadGameValue(kCharacterTaskListHead, task) || task < 0x10000)
         return false;
 
     int16_t characterType = 0;
@@ -192,10 +210,10 @@ unsigned int NextSeed()
 
 bool PreloadEnemyResources(int type, int variant, char* message, size_t messageSize)
 {
-    const auto modelFileId = GameFn<EnemyResourceIdFn>(sh4::addr::kEnemyModelFileIdForType);
-    const auto textureFileId = GameFn<EnemyResourceIdFn>(sh4::addr::kEnemyTextureFileIdForType);
-    const auto extraFileId = GameFn<EnemyResourceIdFn>(sh4::addr::kEnemyExtraFileIdForType);
-    const auto finalize = GameFn<FinalizeResourceLoadFn>(sh4::addr::kFinalizeResourceLoad);
+    const auto modelFileId = GameFn<EnemyResourceIdFn>(kEnemyModelFileIdForType);
+    const auto textureFileId = GameFn<EnemyResourceIdFn>(kEnemyTextureFileIdForType);
+    const auto extraFileId = GameFn<EnemyResourceIdFn>(kEnemyExtraFileIdForType);
+    const auto finalize = GameFn<FinalizeResourceLoadFn>(kFinalizeResourceLoad);
 
     const int ids[] = {modelFileId(type, variant), textureFileId(type, variant), extraFileId(type, variant)};
     if (ids[0] == 0 || ids[1] == 0)
@@ -222,17 +240,17 @@ bool PreloadEnemyResources(int type, int variant, char* message, size_t messageS
 
 bool SpawnOneEnemy(int type, int variant, const Vec3& position, float yaw)
 {
-    const auto createTask = GameFn<CreateCharacterTaskFn>(sh4::addr::kCreateCharacterTask);
-    const auto setupBase = GameFn<SetupEnemyBaseFn>(sh4::addr::kSetupEnemyBase);
-    const auto attachModel = GameFn<AttachEnemyModelFn>(sh4::addr::kAttachEnemyModel);
-    const auto allocateExtra = GameFn<AllocateEnemyExtraFn>(sh4::addr::kAllocateEnemyExtra);
-    const auto setScale = GameFn<SetEnemyFloatBitsFn>(sh4::addr::kSetEnemyScale);
-    const auto setupCollision = GameFn<SetupCharacterCollisionFn>(sh4::addr::kSetupCharacterCollision);
-    const auto setStateSlot = GameFn<SetEnemyIntFn>(sh4::addr::kSetEnemyStateSlot);
-    const auto linkTask = GameFn<LinkCharacterTaskFn>(sh4::addr::kLinkCharacterTask);
-    const auto setMode = GameFn<SetEnemyIntFn>(sh4::addr::kSetEnemyMode);
-    const auto update = GameFn<TaskCallback>(sh4::addr::kEnemyTaskUpdate);
-    const auto step = GameFn<TaskCallback>(sh4::addr::kEnemyTaskStep);
+    const auto createTask = GameFn<CreateCharacterTaskFn>(kCreateCharacterTask);
+    const auto setupBase = GameFn<SetupEnemyBaseFn>(kSetupEnemyBase);
+    const auto attachModel = GameFn<AttachEnemyModelFn>(kAttachEnemyModel);
+    const auto allocateExtra = GameFn<AllocateEnemyExtraFn>(kAllocateEnemyExtra);
+    const auto setScale = GameFn<SetEnemyFloatBitsFn>(kSetEnemyScale);
+    const auto setupCollision = GameFn<SetupCharacterCollisionFn>(kSetupCharacterCollision);
+    const auto setStateSlot = GameFn<SetEnemyIntFn>(kSetEnemyStateSlot);
+    const auto linkTask = GameFn<LinkCharacterTaskFn>(kLinkCharacterTask);
+    const auto setMode = GameFn<SetEnemyIntFn>(kSetEnemyMode);
+    const auto update = GameFn<TaskCallback>(kEnemyTaskUpdate);
+    const auto step = GameFn<TaskCallback>(kEnemyTaskStep);
 
     void* task = createTask(0, 0, &position, yaw, variant << 8, update, nullptr, step, nullptr);
     if (!task)

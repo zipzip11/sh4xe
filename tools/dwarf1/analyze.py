@@ -15,10 +15,32 @@ DWARF v1 layout recap (little-endian here):
   .line   = per-CU line program: u32 len, u32 base_pc, then entries of
               {u32 line, u16 col, u32 pc_offset}.
 """
-import struct, json, collections, sys
+import argparse
+import struct
+import collections
 
-ELF = r"C:\Users\tux\Downloads\Silent Hill 4 - E3 Trial Version (E3 2004)\SILENT_HILL_4_VER_E3\SLUS_208.73"
-data = open(ELF, "rb").read()
+from tool_paths import (
+    add_elf_argument,
+    add_output_argument,
+    fail,
+    read_elf_bytes,
+    resolve_elf_path,
+    resolve_output_path,
+    write_json,
+)
+
+
+parser = argparse.ArgumentParser(description="Inventory recoverable DWARF v1 data in the SH4 E3 trial ELF.")
+add_elf_argument(parser)
+add_output_argument(parser, "summary.json")
+args = parser.parse_args()
+
+try:
+    ELF = resolve_elf_path(args.elf)
+    OUT = resolve_output_path(args.output, "summary.json")
+    data = read_elf_bytes(ELF)
+except Exception as exc:
+    fail(str(exc))
 
 # ---- ELF section table ----
 (e_shoff,) = struct.unpack_from("<I", data, 32)
@@ -34,6 +56,9 @@ def sname(o):
 byname = {}
 for s in secs:
     byname[sname(s[0])] = dict(off=s[2], size=s[3], ent=s[4], link=s[5], info=s[6])
+
+if ".debug" not in byname or ".line" not in byname:
+    fail(f"{ELF} is missing required .debug/.line sections")
 
 dbg = byname[".debug"]; lin = byname[".line"]
 DBASE, DSIZE = dbg["off"], dbg["size"]
@@ -251,11 +276,13 @@ while lp + 8 <= LS:
         min_pc=min(min_pc, base); max_pc=max(max_pc, base+last)
     lp += plen
 
-# symtab
-symn = byname[".symtab"]["size"]//16
+comment = byname.get(".comment")
+comment_data = data[comment["off"]:comment["off"] + comment["size"]].split(b"\0") if comment else []
+symtab = byname.get(".symtab")
+symn = symtab["size"] // 16 if symtab else 0
 
 summary = dict(
-  producer=data[byname['.comment']['off']:byname['.comment']['off']+byname['.comment']['size']].split(b'\0'),
+  producer=comment_data,
   debug_size=DSIZE, line_size=LS,
   total_dies=n_dies,
   tag_hist=dict(tag_hist.most_common()),
@@ -277,7 +304,8 @@ summary = dict(
   symtab_symbols=symn,
 )
 
-json.dump(summary, open("summary.json","w"), indent=1, default=lambda o:o.decode('latin1') if isinstance(o,bytes) else str(o))
+write_json(OUT, summary, indent=1, default=lambda o: o.decode("latin1") if isinstance(o, bytes) else str(o))
+print(f"summary written: {OUT}")
 
 # ---- console report ----
 print(f"DIEs walked        : {n_dies:,}")

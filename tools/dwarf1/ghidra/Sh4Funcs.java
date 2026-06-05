@@ -18,14 +18,13 @@ public class Sh4Funcs extends GhidraScript {
     String filter;
     int nSet, nCreated, nMiss, nErr, nNameClash;
 
-    String MODEL = "C:/Users/tux/Projects/sh4xe/tools/dwarf1/model.json";
-
     public void run() throws Exception {
         dtm = currentProgram.getDataTypeManager();
         String[] a = getScriptArgs();
         filter = (a != null && a.length > 0 && !a[0].isEmpty()) ? a[0] : null;
+        File modelFile = askModelFile();
         JsonObject root;
-        try (Reader r = new BufferedReader(new FileReader(MODEL))) {
+        try (Reader r = new BufferedReader(new FileReader(modelFile))) {
             root = JsonParser.parseReader(r).getAsJsonObject();
         }
         JsonObject types = root.getAsJsonObject("types");
@@ -78,6 +77,14 @@ public class Sh4Funcs extends GhidraScript {
         }
         println("matched=" + total + " set=" + nSet + " created=" + nCreated
                 + " miss=" + nMiss + " nameClash=" + nNameClash + " err=" + nErr);
+    }
+
+    File askModelFile() throws Exception {
+        File modelFile = askFile("Select DWARF model.json", "Open");
+        if (modelFile == null || !modelFile.isFile())
+            throw new FileNotFoundException("Select an existing model.json");
+        println("model: " + modelFile.getAbsolutePath());
+        return modelFile;
     }
 
     DataType resolve(JsonObject ref) {

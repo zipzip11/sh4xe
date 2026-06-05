@@ -31,6 +31,7 @@ constexpr float kDefaultLightingRangeBoost = 1.12f;
 constexpr float kDefaultLightingScreenWarmth = 0.0f;
 constexpr float kDefaultLightingVignette = 0.0f;
 
+std::atomic<LightingPreset> g_lightingPreset{LightingPreset::Modern};
 std::atomic<bool> g_lightingEnabled{kDefaultLightingEnabled};
 std::atomic<float> g_lightingLightBoost{kDefaultLightingLightBoost};
 std::atomic<float> g_lightingAmbientBoost{kDefaultLightingAmbientBoost};
@@ -39,6 +40,7 @@ std::atomic<float> g_lightingSpecularBoost{kDefaultLightingSpecularBoost};
 std::atomic<float> g_lightingRangeBoost{kDefaultLightingRangeBoost};
 std::atomic<float> g_lightingScreenWarmth{kDefaultLightingScreenWarmth};
 std::atomic<float> g_lightingVignette{kDefaultLightingVignette};
+std::atomic<unsigned int> g_lightingRevision{1};
 
 float ClampFloat(float value, float lo, float hi)
 {
@@ -52,6 +54,11 @@ float ClampFloat(float value, float lo, float hi)
 void MarkGraphicsQualityChanged()
 {
     g_graphicsQualityRevision.fetch_add(1, std::memory_order_relaxed);
+}
+
+void MarkLightingChanged()
+{
+    g_lightingRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 } // namespace
@@ -166,6 +173,7 @@ bool SuppressFilterOverride()
 
 void ResetLightingTweak()
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingEnabled.store(kDefaultLightingEnabled, std::memory_order_relaxed);
     g_lightingLightBoost.store(kDefaultLightingLightBoost, std::memory_order_relaxed);
     g_lightingAmbientBoost.store(kDefaultLightingAmbientBoost, std::memory_order_relaxed);
@@ -174,11 +182,85 @@ void ResetLightingTweak()
     g_lightingRangeBoost.store(kDefaultLightingRangeBoost, std::memory_order_relaxed);
     g_lightingScreenWarmth.store(kDefaultLightingScreenWarmth, std::memory_order_relaxed);
     g_lightingVignette.store(kDefaultLightingVignette, std::memory_order_relaxed);
+    MarkLightingChanged();
+}
+
+void ApplyLightingPreset(LightingPreset preset)
+{
+    g_lightingPreset.store(preset, std::memory_order_relaxed);
+
+    switch (preset)
+    {
+        case LightingPreset::Game:
+            g_lightingEnabled.store(false, std::memory_order_relaxed);
+            g_lightingLightBoost.store(1.0f, std::memory_order_relaxed);
+            g_lightingAmbientBoost.store(1.0f, std::memory_order_relaxed);
+            g_lightingAmbientLift.store(0.0f, std::memory_order_relaxed);
+            g_lightingSpecularBoost.store(0.0f, std::memory_order_relaxed);
+            g_lightingRangeBoost.store(1.0f, std::memory_order_relaxed);
+            g_lightingScreenWarmth.store(0.0f, std::memory_order_relaxed);
+            g_lightingVignette.store(0.0f, std::memory_order_relaxed);
+            break;
+        case LightingPreset::Bright:
+            g_lightingEnabled.store(true, std::memory_order_relaxed);
+            g_lightingLightBoost.store(1.45f, std::memory_order_relaxed);
+            g_lightingAmbientBoost.store(1.25f, std::memory_order_relaxed);
+            g_lightingAmbientLift.store(0.055f, std::memory_order_relaxed);
+            g_lightingSpecularBoost.store(1.6f, std::memory_order_relaxed);
+            g_lightingRangeBoost.store(1.25f, std::memory_order_relaxed);
+            g_lightingScreenWarmth.store(0.0f, std::memory_order_relaxed);
+            g_lightingVignette.store(0.0f, std::memory_order_relaxed);
+            break;
+        case LightingPreset::Soft:
+            g_lightingEnabled.store(true, std::memory_order_relaxed);
+            g_lightingLightBoost.store(1.12f, std::memory_order_relaxed);
+            g_lightingAmbientBoost.store(1.08f, std::memory_order_relaxed);
+            g_lightingAmbientLift.store(0.020f, std::memory_order_relaxed);
+            g_lightingSpecularBoost.store(0.8f, std::memory_order_relaxed);
+            g_lightingRangeBoost.store(1.08f, std::memory_order_relaxed);
+            g_lightingScreenWarmth.store(0.0f, std::memory_order_relaxed);
+            g_lightingVignette.store(0.0f, std::memory_order_relaxed);
+            break;
+        case LightingPreset::Modern:
+        default:
+            ResetLightingTweak();
+            return;
+    }
+
+    MarkLightingChanged();
+}
+
+LightingPreset CurrentLightingPreset()
+{
+    return g_lightingPreset.load(std::memory_order_relaxed);
+}
+
+const char* LightingPresetName(LightingPreset preset)
+{
+    switch (preset)
+    {
+        case LightingPreset::Game:
+            return "game";
+        case LightingPreset::Bright:
+            return "bright";
+        case LightingPreset::Soft:
+            return "soft";
+        case LightingPreset::Modern:
+        default:
+            return "modern";
+    }
+}
+
+unsigned int LightingRevision()
+{
+    return g_lightingRevision.load(std::memory_order_relaxed);
 }
 
 void SetLightingEnabled(bool enabled)
 {
+    g_lightingPreset.store(enabled ? LightingPreset::Modern : LightingPreset::Game, std::memory_order_relaxed);
     g_lightingEnabled.store(enabled, std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 bool LightingEnabled()
@@ -188,7 +270,9 @@ bool LightingEnabled()
 
 void SetLightingLightBoost(float boost)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingLightBoost.store(ClampFloat(boost, 0.0f, 3.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingLightBoost()
@@ -198,7 +282,9 @@ float LightingLightBoost()
 
 void SetLightingAmbientBoost(float boost)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingAmbientBoost.store(ClampFloat(boost, 0.0f, 3.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingAmbientBoost()
@@ -208,7 +294,9 @@ float LightingAmbientBoost()
 
 void SetLightingAmbientLift(float lift)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingAmbientLift.store(ClampFloat(lift, 0.0f, 0.25f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingAmbientLift()
@@ -218,7 +306,9 @@ float LightingAmbientLift()
 
 void SetLightingSpecularBoost(float boost)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingSpecularBoost.store(ClampFloat(boost, 0.0f, 4.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingSpecularBoost()
@@ -228,7 +318,9 @@ float LightingSpecularBoost()
 
 void SetLightingRangeBoost(float boost)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingRangeBoost.store(ClampFloat(boost, 0.25f, 3.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingRangeBoost()
@@ -238,7 +330,9 @@ float LightingRangeBoost()
 
 void SetLightingScreenWarmth(float warmth)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingScreenWarmth.store(ClampFloat(warmth, 0.0f, 1.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingScreenWarmth()
@@ -248,7 +342,9 @@ float LightingScreenWarmth()
 
 void SetLightingVignette(float vignette)
 {
+    g_lightingPreset.store(LightingPreset::Modern, std::memory_order_relaxed);
     g_lightingVignette.store(ClampFloat(vignette, 0.0f, 1.0f), std::memory_order_relaxed);
+    MarkLightingChanged();
 }
 
 float LightingVignette()

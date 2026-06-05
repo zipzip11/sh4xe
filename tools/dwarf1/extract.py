@@ -17,10 +17,31 @@ type-ref token (recursive, JSON):
   {"k":"ptr","e":<ref>}              pointer to
   {"k":"const","e":<ref>} / "vol"    cv-qualified (Ghidra ignores; kept for fidelity)
 """
-import struct, json, collections, sys
+import argparse
+import struct
 
-ELF = r"C:\Users\tux\Downloads\Silent Hill 4 - E3 Trial Version (E3 2004)\SILENT_HILL_4_VER_E3\SLUS_208.73"
-data = open(ELF, "rb").read()
+from tool_paths import (
+    add_elf_argument,
+    add_output_argument,
+    fail,
+    read_elf_bytes,
+    resolve_elf_path,
+    resolve_output_path,
+    write_json,
+)
+
+
+parser = argparse.ArgumentParser(description="Extract the SH4 E3 trial DWARF v1 model for Ghidra import.")
+add_elf_argument(parser)
+add_output_argument(parser, "model.json")
+args = parser.parse_args()
+
+try:
+    ELF = resolve_elf_path(args.elf)
+    OUT = resolve_output_path(args.output, "model.json")
+    data = read_elf_bytes(ELF)
+except Exception as exc:
+    fail(str(exc))
 (e_shoff,) = struct.unpack_from("<I", data, 32)
 ess, esn, esi = struct.unpack_from("<HHH", data, 46)
 secs = [struct.unpack_from("<IIIIIIIIII", data, e_shoff+i*ess) for i in range(esn)]
@@ -28,6 +49,8 @@ sh = secs[esi][4]
 def sn(o):
     e = data.find(b"\0", sh+o); return data[sh+o:e].decode("latin1")
 byn = {sn(s[0]): s for s in secs}
+if ".debug" not in byn or ".line" not in byn:
+    fail(f"{ELF} is missing required .debug/.line sections")
 DB, DS = byn[".debug"][4], byn[".debug"][5]
 LB, LS = byn[".line"][4], byn[".line"][5]
 
@@ -300,8 +323,8 @@ model = dict(
               dwarf_version=1),
     types=types, funcs=funcs, globals=globs, files=files, lines=lines)
 
-json.dump(model, open("model.json", "w"))
-print("== model.json written ==")
+write_json(OUT, model)
+print(f"== {OUT} written ==")
 for k, v in model["meta"].items():
     print(f"  {k:14}: {v}")
 # spot checks

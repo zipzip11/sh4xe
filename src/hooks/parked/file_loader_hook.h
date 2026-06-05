@@ -1,5 +1,8 @@
 #pragma once
 
+// PARKED: experimental loader logging/preload support. Not part of the active
+// build unless it is intentionally moved back out of src/hooks/parked.
+
 namespace sh4xe::hooks::file_loader
 {
 

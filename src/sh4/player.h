@@ -33,7 +33,7 @@ struct Vec4
 static_assert(sizeof(Vec4) == 0x10, "SH4 vectors are four floats");
 
 // Entries consumed by Player_AccumulateContactImpact (0x0053F4E0). The function
-// iterates kPlayerContactCount entries at kPlayerContactList, stride 0x30, and
+// iterates the contact list at 0x010A33C0, count at 0x010A3350, stride 0x30, and
 // adds the float at +0x04 for valid entries. The validity/owner fields are still
 // intentionally unnamed.
 struct ContactEntryPartial

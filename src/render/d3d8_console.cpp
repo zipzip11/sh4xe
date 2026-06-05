@@ -1,10 +1,8 @@
 #include "render/d3d8_console.h"
 
 #include "core/framework.h"
-#include "hooks/enemy_spawn_hook.h"
 #include "hooks/fov_hook.h"
 #include "hooks/fps_unlock_hook.h"
-#include "hooks/god_mode_hook.h"
 #include "render/console_font.h"
 #include "render/display_config.h"
 #include "render/render_tweaks.h"
@@ -562,55 +560,6 @@ void ExecuteFpsCommandLocked(const std::string& command)
     ReportFpsCommandLocked();
 }
 
-std::string GodCommandArgs(const std::string& command)
-{
-    if (command == "god" || command == "godmode" || command == "immortal" || command == "invincible")
-        return std::string();
-    if (command.rfind("god ", 0) == 0)
-        return command.substr(4);
-    if (command.rfind("godmode ", 0) == 0)
-        return command.substr(8);
-    if (command.rfind("immortal ", 0) == 0)
-        return command.substr(9);
-    return command.substr(11);
-}
-
-void ReportGodCommandLocked()
-{
-    char message[160] = {};
-    hooks::god_mode::DescribeGodMode(message, sizeof(message));
-    PushLineLocked(message);
-}
-
-void ExecuteGodCommandLocked(const std::string& command)
-{
-    const std::string args = GodCommandArgs(command);
-
-    if (args.empty() || args == "status")
-    {
-        ReportGodCommandLocked();
-        PushLineLocked("ok usage: god <on|off|status>");
-        return;
-    }
-
-    if (args == "toggle")
-    {
-        hooks::god_mode::SetGodModeEnabled(!hooks::god_mode::GodModeEnabled());
-        ReportGodCommandLocked();
-        return;
-    }
-
-    bool enabled = false;
-    if (ParseToggle(args, enabled))
-    {
-        hooks::god_mode::SetGodModeEnabled(enabled);
-        ReportGodCommandLocked();
-        return;
-    }
-
-    PushLineLocked("err god: use on|off|status");
-}
-
 bool ParseDoubleExact(const std::string& value, double& parsed)
 {
     char* end = nullptr;
@@ -631,47 +580,6 @@ bool ParseToggle(const std::string& value, bool& enabled)
         return true;
     }
     return false;
-}
-
-bool ParseIntExact(const std::string& value, int& parsed)
-{
-    char* end = nullptr;
-    const long result = std::strtol(value.c_str(), &end, 10);
-    if (!end || end == value.c_str() || *end != '\0' || result < -32768 || result > 32767)
-        return false;
-
-    parsed = static_cast<int>(result);
-    return true;
-}
-
-std::string ToLowerAscii(std::string value)
-{
-    for (char& ch : value)
-    {
-        if (ch >= 'A' && ch <= 'Z')
-            ch = static_cast<char>(ch + ('a' - 'A'));
-    }
-    return value;
-}
-
-std::vector<std::string> SplitWords(const std::string& value)
-{
-    std::vector<std::string> words;
-    size_t pos = 0;
-    while (pos < value.size())
-    {
-        while (pos < value.size() && (value[pos] == ' ' || value[pos] == '\t'))
-            ++pos;
-
-        const size_t start = pos;
-        while (pos < value.size() && value[pos] != ' ' && value[pos] != '\t')
-            ++pos;
-
-        if (start < pos)
-            words.push_back(value.substr(start, pos - start));
-    }
-
-    return words;
 }
 
 void ReportFilterCommandLocked()
@@ -869,172 +777,6 @@ void ExecuteGraphicsCommandLocked(const std::string& command)
     PushLineLocked("err graphics: use modern|game|reset|dither");
 }
 
-std::string SpawnCommandArgs(const std::string& command)
-{
-    if (command == "spawn" || command == "enemy" || command == "summon")
-        return std::string();
-    if (command.rfind("spawn ", 0) == 0)
-        return command.substr(6);
-    if (command.rfind("summon ", 0) == 0)
-        return command.substr(7);
-    return command.substr(6);
-}
-
-void PrintSpawnUsageLocked()
-{
-    PushLineLocked("ok usage: spawn [random|list|<enemy|type> [count] [variant] [distance]]");
-    PushLineLocked(std::string("ok enemies: ") + hooks::enemy_spawn::EnemyListSummary());
-    PushLineLocked("ok examples: spawn | spawn buzz 2 | spawn twins 1 0 800");
-}
-
-bool ParseSpawnIntTokenLocked(const std::string& token, const char* usage, int& value)
-{
-    if (!ParseIntExact(token, value))
-    {
-        PushLineLocked(usage);
-        return false;
-    }
-
-    return true;
-}
-
-bool ParseSpawnDistanceTokenLocked(const std::string& token, float& distance)
-{
-    double parsed = 0.0;
-    if (!ParseDoubleExact(token, parsed))
-    {
-        PushLineLocked("err spawn distance: use 150..2500");
-        return false;
-    }
-
-    distance = static_cast<float>(parsed);
-    return true;
-}
-
-void ExecuteSpawnCommandLocked(const std::string& command)
-{
-    constexpr float kDefaultDistance = 600.0f;
-
-    const std::string args = ToLowerAscii(SpawnCommandArgs(command));
-    const std::vector<std::string> words = SplitWords(args);
-    char message[192] = {};
-
-    if (words.empty() || words[0] == "random" || words[0] == "surprise" || words[0] == "me")
-    {
-        hooks::enemy_spawn::SpawnSurprise(message, sizeof(message));
-        PushLineLocked(message);
-        return;
-    }
-
-    if (words[0] == "help" || words[0] == "?")
-    {
-        PrintSpawnUsageLocked();
-        return;
-    }
-
-    if (words[0] == "list" || words[0] == "enemies")
-    {
-        PushLineLocked(std::string("ok enemies: ") + hooks::enemy_spawn::EnemyListSummary());
-        PushLineLocked("ok aliases: dog=hyena bat=buzz baby=bab walter=killer det=detective");
-        return;
-    }
-
-    int type = 0;
-    int variant = 0;
-    size_t index = 1;
-
-    const hooks::enemy_spawn::EnemyChoice* choice = hooks::enemy_spawn::FindEnemyChoice(words[0].c_str());
-    if (choice)
-    {
-        type = choice->type;
-        variant = choice->variant;
-    }
-    else if (words[0] == "type")
-    {
-        if (words.size() < 2 || !ParseSpawnIntTokenLocked(words[1], "err spawn type: use 2..17", type))
-            return;
-        index = 2;
-    }
-    else if (!ParseSpawnIntTokenLocked(words[0], "err spawn: unknown enemy; use spawn list", type))
-    {
-        return;
-    }
-
-    int count = 1;
-    float distance = kDefaultDistance;
-    bool countSet = false;
-    bool variantSet = false;
-    bool distanceSet = false;
-
-    while (index < words.size())
-    {
-        const std::string& token = words[index++];
-
-        if (token == "count" || token == "x")
-        {
-            if (index >= words.size() ||
-                !ParseSpawnIntTokenLocked(words[index++], "err spawn count: use 1..8", count))
-                return;
-            countSet = true;
-            continue;
-        }
-
-        if (token == "variant" || token == "var" || token == "v")
-        {
-            if (index >= words.size() ||
-                !ParseSpawnIntTokenLocked(words[index++], "err spawn variant: use 0..99", variant))
-                return;
-            variantSet = true;
-            continue;
-        }
-
-        if (token == "distance" || token == "dist" || token == "d")
-        {
-            if (index >= words.size() || !ParseSpawnDistanceTokenLocked(words[index++], distance))
-                return;
-            distanceSet = true;
-            continue;
-        }
-
-        if (!countSet)
-        {
-            if (!ParseSpawnIntTokenLocked(token, "err spawn count: use 1..8", count))
-                return;
-            countSet = true;
-            continue;
-        }
-
-        if (!variantSet)
-        {
-            if (!ParseSpawnIntTokenLocked(token, "err spawn variant: use 0..99", variant))
-                return;
-            variantSet = true;
-            continue;
-        }
-
-        if (!distanceSet)
-        {
-            if (!ParseSpawnDistanceTokenLocked(token, distance))
-                return;
-            distanceSet = true;
-            continue;
-        }
-
-        PushLineLocked("err spawn: too many arguments");
-        PrintSpawnUsageLocked();
-        return;
-    }
-
-    if (variant < 0 || variant > 99)
-    {
-        PushLineLocked("err spawn variant: use 0..99");
-        return;
-    }
-
-    hooks::enemy_spawn::SpawnEnemy(type, variant, count, distance, message, sizeof(message));
-    PushLineLocked(message);
-}
-
 std::string LightingCommandArgs(const std::string& command)
 {
     if (command == "lighting" || command == "lights")
@@ -1049,8 +791,9 @@ void ReportLightingCommandLocked()
     char message[192] = {};
     snprintf(message,
              sizeof(message),
-             "ok lighting=%s boost=%.2f ambient=%.2f lift=%.3f spec=%.2f range=%.2f grade=%.2f vignette=%.2f",
+             "ok lighting=%s preset=%s boost=%.2f ambient=%.2f lift=%.3f spec=%.2f range=%.2f grade=%.2f vignette=%.2f",
              render::tweaks::LightingEnabled() ? "on" : "off",
+             render::tweaks::LightingPresetName(render::tweaks::CurrentLightingPreset()),
              static_cast<double>(render::tweaks::LightingLightBoost()),
              static_cast<double>(render::tweaks::LightingAmbientBoost()),
              static_cast<double>(render::tweaks::LightingAmbientLift()),
@@ -1072,6 +815,31 @@ bool ParseLightingNumberLocked(const std::string& value, double minValue, double
     return true;
 }
 
+bool ParseLightingPreset(const std::string& value, render::tweaks::LightingPreset& preset)
+{
+    if (value == "game" || value == "stock" || value == "off")
+    {
+        preset = render::tweaks::LightingPreset::Game;
+        return true;
+    }
+    if (value == "modern" || value == "reset" || value == "default" || value == "on")
+    {
+        preset = render::tweaks::LightingPreset::Modern;
+        return true;
+    }
+    if (value == "bright")
+    {
+        preset = render::tweaks::LightingPreset::Bright;
+        return true;
+    }
+    if (value == "soft")
+    {
+        preset = render::tweaks::LightingPreset::Soft;
+        return true;
+    }
+    return false;
+}
+
 void ExecuteLightingCommandLocked(const std::string& command)
 {
     const std::string args = LightingCommandArgs(command);
@@ -1079,15 +847,20 @@ void ExecuteLightingCommandLocked(const std::string& command)
     if (args.empty())
     {
         ReportLightingCommandLocked();
-        PushLineLocked("ok usage: lighting <on|off|reset>");
+        PushLineLocked("ok usage: lighting <modern|game|bright|soft>");
         PushLineLocked("ok        lighting boost|ambient|spec|range <value>");
         PushLineLocked("ok        lighting lift <0..0.25>  grade|vignette <0..1>");
         return;
     }
 
-    if (args == "reset" || args == "default")
+    std::string presetArg = args;
+    if (args.rfind("preset ", 0) == 0)
+        presetArg = args.substr(7);
+
+    render::tweaks::LightingPreset preset = render::tweaks::LightingPreset::Modern;
+    if (ParseLightingPreset(presetArg, preset))
     {
-        render::tweaks::ResetLightingTweak();
+        render::tweaks::ApplyLightingPreset(preset);
         ReportLightingCommandLocked();
         return;
     }
@@ -1095,7 +868,10 @@ void ExecuteLightingCommandLocked(const std::string& command)
     bool enabled = false;
     if (ParseToggle(args, enabled))
     {
-        render::tweaks::SetLightingEnabled(enabled);
+        if (enabled && render::tweaks::CurrentLightingPreset() == render::tweaks::LightingPreset::Game)
+            render::tweaks::ApplyLightingPreset(render::tweaks::LightingPreset::Modern);
+        else
+            render::tweaks::SetLightingEnabled(enabled);
         ReportLightingCommandLocked();
         return;
     }
@@ -1168,12 +944,12 @@ void ExecuteLightingCommandLocked(const std::string& command)
         return;
     }
 
-    PushLineLocked("err lighting: use on|off|reset|boost|ambient|lift|spec|range|grade|vignette");
+    PushLineLocked("err lighting: use modern|game|bright|soft|boost|ambient|lift|spec|range|grade|vignette");
 }
 
-void ExecuteCameraCommandLocked(const std::string&)
+void ExecuteParkedFeatureCommandLocked(const char* feature)
 {
-    PushLineLocked("err camera responsiveness hook is parked in src/hooks/parked");
+    PushLineLocked(std::string("err ") + feature + " is parked in src/hooks/parked");
 }
 
 void ExecuteCommandLocked(const std::string& command)
@@ -1186,17 +962,16 @@ void ExecuteCommandLocked(const std::string& command)
     }
     else if (command == "help")
     {
-        PushLineLocked("ok commands: help, clear, echo <text>, display, fps, god, graphics, lighting, spawn");
+        PushLineLocked("ok commands: help, clear, echo <text>, display, filter, fog, fov, fps, graphics, lighting");
         PushLineLocked("ok   graphics <modern|game|reset> | graphics dither <on|off>");
         PushLineLocked("ok   filter <game|point|linear|aniso> | filter bias <value>");
         PushLineLocked("ok   fog <on|off|soft|game> | fog distance|density <scale>");
         PushLineLocked("ok   fov <degrees> | fov reset  (default 35)");
         PushLineLocked("ok   fps <30|60|120> | fps on|off|reset");
-        PushLineLocked("ok   god <on|off|status>");
-        PushLineLocked("ok   lighting <on|off|reset|boost|ambient|lift|spec|range|grade|vignette>");
-        PushLineLocked("ok   spawn [random|list|<enemy|type> [count] [variant] [distance]]");
+        PushLineLocked("ok   lighting <modern|game|bright|soft> | advanced boost/ambient/spec/range");
         PushLineLocked("ok   display <fullscreen|windowed|borderless> [widthxheight]");
         PushLineLocked("ok   display resolution <width>x<height>");
+        PushLineLocked("ok   parked: camera/mouselook, god, spawn/enemy/summon");
         PushLineLocked("ok   history: up/ctrl-p previous, down/ctrl-n next");
     }
     else if (command.rfind("echo ", 0) == 0)
@@ -1227,13 +1002,13 @@ void ExecuteCommandLocked(const std::string& command)
     else if (command == "camera" || command.rfind("camera ", 0) == 0 || command == "mouselook" ||
              command.rfind("mouselook ", 0) == 0)
     {
-        ExecuteCameraCommandLocked(command);
+        ExecuteParkedFeatureCommandLocked("camera responsiveness hook");
     }
     else if (command == "god" || command.rfind("god ", 0) == 0 || command == "godmode" ||
              command.rfind("godmode ", 0) == 0 || command == "immortal" || command.rfind("immortal ", 0) == 0 ||
              command == "invincible" || command.rfind("invincible ", 0) == 0)
     {
-        ExecuteGodCommandLocked(command);
+        ExecuteParkedFeatureCommandLocked("god mode hook");
     }
     else if (command == "graphics" || command.rfind("graphics ", 0) == 0 || command == "gfx" ||
              command.rfind("gfx ", 0) == 0)
@@ -1246,7 +1021,7 @@ void ExecuteCommandLocked(const std::string& command)
     else if (command == "spawn" || command.rfind("spawn ", 0) == 0 || command == "enemy" ||
              command.rfind("enemy ", 0) == 0 || command == "summon" || command.rfind("summon ", 0) == 0)
     {
-        ExecuteSpawnCommandLocked(command);
+        ExecuteParkedFeatureCommandLocked("enemy spawn hook");
     }
     else if (command == "lighting" || command.rfind("lighting ", 0) == 0 || command == "lights" ||
              command.rfind("lights ", 0) == 0)
