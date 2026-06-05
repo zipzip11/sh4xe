@@ -57,6 +57,12 @@ msbuild sh4xe.sln /p:Configuration=Release /p:Platform=Win32 /m
 # add /p:DeployAfterBuild=true to also copy the DLL into the game dir
 ```
 
+GitHub Actions builds use `.github/workflows/build.yml` and
+`.github/workflows/release.yml`. Those workflows override CI builds to
+`PlatformToolset=v143` and `WindowsTargetPlatformVersion=10.0` so GitHub-hosted
+Windows runners can build the project even if the local checkout targets newer
+Visual Studio defaults.
+
 ## Runtime Notes
 
 The DLL writes `scripts/sh4xe.log` next to the game executable and loads optional
@@ -67,6 +73,10 @@ commands cover `help`, `clear`, `echo`, `display`, `filter`, `fog`, `fov`,
 The camera responsiveness/mouselook hook is disabled and parked in
 `src/hooks/parked/`. The overlay still reports old `camera`/`mouselook` inputs as
 parked so stale notes do not silently appear to work.
+
+Releases are experimental research snapshots, not stable modpack builds. Tags
+matching `v*` trigger the release workflow, which creates a prerelease containing
+`dsound.dll`, `dsound.pdb`, and install notes.
 
 ## Tools
 

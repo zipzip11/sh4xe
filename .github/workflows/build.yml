@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  win32-release:
+    name: Release Win32
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build dsound.dll
+        shell: pwsh
+        run: >
+          msbuild sh4xe.sln
+          /m
+          /p:Configuration=Release
+          /p:Platform=Win32
+          /p:DeployAfterBuild=false
+          /p:PlatformToolset=v143
+          /p:WindowsTargetPlatformVersion=10.0
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sh4xe-release-win32
+          path: |
+            bin/Release/dsound.dll
+            bin/Release/dsound.pdb
+          if-no-files-found: error
+          retention-days: 14

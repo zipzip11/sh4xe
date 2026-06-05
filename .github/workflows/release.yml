@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to package, for example v0.1.0-research.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package experimental release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          submodules: recursive
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build dsound.dll
+        shell: pwsh
+        run: >
+          msbuild sh4xe.sln
+          /m
+          /p:Configuration=Release
+          /p:Platform=Win32
+          /p:DeployAfterBuild=false
+          /p:PlatformToolset=v143
+          /p:WindowsTargetPlatformVersion=10.0
+
+      - name: Package release zip
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag = $env:RELEASE_TAG
+          $stage = Join-Path "dist" "sh4xe-$tag-win32"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          Copy-Item -LiteralPath "bin/Release/dsound.dll" -Destination $stage
+          Copy-Item -LiteralPath "bin/Release/dsound.pdb" -Destination $stage
+
+          @"
+          sh4xe $tag
+
+          Experimental research snapshot for the GOG release of Silent Hill 4.
+
+          Install:
+          1. Back up any existing dsound.dll in the game directory.
+          2. Copy dsound.dll next to SILENT HILL 4.exe.
+          3. Runtime logs are written to scripts/sh4xe.log.
+
+          This is not a stable modpack release. Expect rough edges and verify
+          behavior against the current README and docs.
+          "@.Trim() | Set-Content -LiteralPath (Join-Path $stage "README.txt") -Encoding ASCII
+
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath "dist/sh4xe-$tag-win32.zip" -Force
+
+          @"
+          Experimental research snapshot for the GOG release of Silent Hill 4.
+
+          Assets:
+          - sh4xe-$tag-win32.zip: installable dsound.dll plus PDB and release README.
+          - dsound.dll: raw build output.
+          - dsound.pdb: symbols for debugging.
+
+          This release does not include game assets. It is intended for testing
+          and reversing work, not as a polished end-user modpack.
+          "@.Trim() | Set-Content -LiteralPath "dist/release-notes.md" -Encoding ASCII
+
+      - name: Create or update GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $tag = $env:RELEASE_TAG
+          $zip = "dist/sh4xe-$tag-win32.zip"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit $tag `
+              --title "sh4xe $tag" `
+              --notes-file "dist/release-notes.md" `
+              --prerelease
+            gh release upload $tag $zip bin/Release/dsound.dll bin/Release/dsound.pdb --clobber
+          } else {
+            gh release create $tag $zip bin/Release/dsound.dll bin/Release/dsound.pdb `
+              --title "sh4xe $tag" `
+              --notes-file "dist/release-notes.md" `
+              --prerelease
+          }
